@@ -7,10 +7,32 @@ interface LoginScreenProps {
 
 type Mode = 'signin' | 'signup';
 
+// 아이디(이메일) 기억하기 — localStorage 저장 키
+const REMEMBER_KEY = 'eos_remember_email';
+
+function loadRememberedEmail(): string {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function saveRememberedEmail(email: string, remember: boolean): void {
+  try {
+    if (remember && email) localStorage.setItem(REMEMBER_KEY, email);
+    else localStorage.removeItem(REMEMBER_KEY);
+  } catch {
+    // localStorage 비활성(시크릿 모드 등) — 무시
+  }
+}
+
 export function LoginScreen({ onSignIn, onSignUp }: LoginScreenProps) {
+  const remembered = loadRememberedEmail();
   const [mode, setMode] = useState<Mode>('signin');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(remembered);
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(Boolean(remembered));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -31,6 +53,7 @@ export function LoginScreen({ onSignIn, onSignUp }: LoginScreenProps) {
     try {
       if (mode === 'signin') {
         await onSignIn(email.trim(), password);
+        saveRememberedEmail(email.trim(), remember); // 로그인 성공 시에만 반영
       } else {
         const { needsEmailConfirm } = await onSignUp(email.trim(), password);
         if (needsEmailConfirm) {
@@ -84,6 +107,18 @@ export function LoginScreen({ onSignIn, onSignUp }: LoginScreenProps) {
             disabled={busy}
           />
         </label>
+
+        {mode === 'signin' && (
+          <label className="auth-remember">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              disabled={busy}
+            />
+            <span>아이디 기억하기</span>
+          </label>
+        )}
 
         {error && <div className="auth-msg err">{error}</div>}
         {notice && <div className="auth-msg ok">{notice}</div>}
