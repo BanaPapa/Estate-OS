@@ -49,6 +49,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.send(text);
   } catch (err) {
-    res.status(502).json({ proxyError: err instanceof Error ? err.message : String(err) });
+    const e = err as { message?: string; cause?: { code?: string; message?: string; errno?: number } };
+    res.status(502).json({
+      proxyError: e?.message ?? String(err),
+      causeCode: e?.cause?.code,
+      causeMessage: e?.cause?.message,
+    });
   }
 }
