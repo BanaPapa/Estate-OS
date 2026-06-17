@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/naver-api/:path*", "destination": "/api/naver-proxy/:path*" },
-    { "source": "/naver-new-api/:path*", "destination": "/api/naver-new-proxy/:path*" }
+    { "source": "/naver-api/(.*)", "destination": "/api/naver-proxy?__path=$1" },
+    { "source": "/naver-new-api/(.*)", "destination": "/api/naver-new-proxy?__path=$1" }
   ]
 }

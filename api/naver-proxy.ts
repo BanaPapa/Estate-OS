@@ -1,13 +1,14 @@
 // Vercel Serverless Function (Node) — fin.land.naver.com 프록시 (프로덕션 전용)
 // 개발: Vite proxy(vite.config.ts '/naver-api')가 대신 처리.
+// 경로는 vercel.json rewrite 가 __path 쿼리로 전달한다 (zero-config catch-all 미지원 우회).
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const NAVER_BASE = 'https://fin.land.naver.com/front-api/v1';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const reqUrl = new URL(req.url ?? '', 'http://localhost');
-  // /api/naver-proxy/search/autocomplete/complexes → search/autocomplete/complexes
-  const subPath = reqUrl.pathname.replace(/^\/api\/naver-proxy\//, '');
+  const subPath = reqUrl.searchParams.get('__path') ?? '';
+  reqUrl.searchParams.delete('__path');
 
   const target = new URL(`${NAVER_BASE}/${subPath}`);
   reqUrl.searchParams.forEach((value, key) => target.searchParams.set(key, value));

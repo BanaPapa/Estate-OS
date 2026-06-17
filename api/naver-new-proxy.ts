@@ -1,14 +1,15 @@
 // Vercel Serverless Function (Node) — new.land.naver.com 프록시 (프로덕션 전용)
 // 개발: Vite proxy(vite.config.ts '/naver-new-api')가 대신 처리.
 // 아파트 단지 목록(single-markers / cortars)과 빌라·단독 직접 매물(/api/articles)이 모두 이 도메인을 사용한다.
+// 경로는 vercel.json rewrite 가 __path 쿼리로 전달한다 (zero-config catch-all 미지원 우회).
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const NEW_LAND_BASE = 'https://new.land.naver.com';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const reqUrl = new URL(req.url ?? '', 'http://localhost');
-  // /api/naver-new-proxy/api/articles → api/articles
-  const subPath = reqUrl.pathname.replace(/^\/api\/naver-new-proxy\//, '');
+  const subPath = reqUrl.searchParams.get('__path') ?? '';
+  reqUrl.searchParams.delete('__path');
 
   const target = new URL(`${NEW_LAND_BASE}/${subPath}`);
   reqUrl.searchParams.forEach((value, key) => target.searchParams.set(key, value));
