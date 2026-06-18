@@ -20,6 +20,9 @@ interface NaverCrawlerTabProps {
   session: Session | null;
 }
 
+const AGENT_DOWNLOAD_URL =
+  'https://github.com/BanaPapa/Estate-OS/releases/latest/download/Estate-OS-Agent-Setup.exe';
+
 export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProps) {
   const { state, start, stop, skipDong, reset, clearLogs, load } = crawler;
   const [searchKey, setSearchKey] = useState(0);
@@ -29,6 +32,8 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
   const [crawlModalOpen, setCrawlModalOpen] = useState(false);
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [installDone, setInstallDone] = useState(false);
   const {
     status: agentStatus,
     cookieReady,
@@ -70,6 +75,16 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
       setNaverCrawlToken(null);
     }
   }, [agentStatus, session]);
+
+  const handleInstallConsent = () => {
+    setInstallDone(true);
+    window.location.href = AGENT_DOWNLOAD_URL;
+  };
+
+  const handleCloseInstallModal = () => {
+    setShowInstallModal(false);
+    setInstallDone(false);
+  };
 
   const canSave = state.properties.length > 0 && state.lastConfig !== null;
   const savedCount = slots.slots.filter(Boolean).length;
@@ -148,31 +163,75 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
           <div className="nv-agent-steps">
             <div className="nv-agent-step">
               <span className="step-num">1</span>
-              <span>아래 버튼에서 에이전트를 다운로드합니다.</span>
+              <span>아래 버튼을 눌러 에이전트를 설치합니다.</span>
             </div>
             <div className="nv-agent-step">
               <span className="step-num">2</span>
-              <span>설치 후 실행하면 트레이에 아이콘이 표시됩니다.</span>
+              <span>설치가 완료되면 트레이에 아이콘이 표시됩니다.</span>
             </div>
             <div className="nv-agent-step">
               <span className="step-num">3</span>
-              <span>에이전트가 실행된 상태에서 아래 버튼을 누르세요.</span>
+              <span>에이전트가 실행 중일 때 아래 재시도 버튼을 누르세요.</span>
             </div>
           </div>
           <div className="nv-agent-actions">
-            <a
-              className="btn-primary"
-              href="https://github.com/BanaPapa/Estate-OS/releases/latest"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              에이전트 다운로드
-            </a>
+            <button className="btn-primary" onClick={() => setShowInstallModal(true)}>
+              에이전트 설치
+            </button>
             <button className="btn-outline" onClick={recheckAgent}>
               연결 재시도
             </button>
           </div>
         </div>
+
+        {showInstallModal && (
+          <div className="nv-install-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleCloseInstallModal(); }}>
+            <div className="nv-install-modal">
+              <div className="nv-install-modal-header">
+                <h3>Estate-OS Agent 설치</h3>
+                <button className="nv-install-close" onClick={handleCloseInstallModal} aria-label="닫기">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+
+              {installDone ? (
+                <div className="nv-install-done">
+                  <div className="nv-install-done-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  </div>
+                  <p className="nv-install-done-title">다운로드가 시작되었습니다!</p>
+                  <p className="nv-install-done-desc">
+                    파일 다운로드가 완료되면 실행해 주세요.
+                    <br />
+                    클릭 한 번으로 설치가 자동 완료됩니다.
+                  </p>
+                  <button className="btn-primary nv-install-action-btn" onClick={handleCloseInstallModal}>
+                    확인
+                  </button>
+                </div>
+              ) : (
+                <div className="nv-install-modal-body">
+                  <p>이 PC에 <b>Estate-OS Agent</b>를 설치합니다.</p>
+                  <ul className="nv-install-list">
+                    <li>설치 위치: 현재 사용자 앱 폴더 (관리자 권한 불필요)</li>
+                    <li>Windows 시작 시 자동 실행 (트레이 상주)</li>
+                    <li>네이버 부동산 요청을 로컬 IP로 중계</li>
+                  </ul>
+                  <div className="nv-install-modal-actions">
+                    <button className="btn-outline" onClick={handleCloseInstallModal}>취소</button>
+                    <button className="btn-primary nv-install-action-btn" onClick={handleInstallConsent}>
+                      동의하고 설치
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -199,7 +258,7 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
           )}
           <div className="nv-agent-actions">
             <button
-              className="btn-primary nv-login-btn"
+              className="nv-login-btn"
               onClick={triggerLogin}
               disabled={loginLoading}
             >
@@ -233,7 +292,7 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
               <path d="M20 6L9 17l-5-5" />
             </svg>
           </div>
-          <h2 style={{ color: 'var(--accent)' }}>네이버 로그인 완료!</h2>
+          <h2 style={{ color: 'var(--blue)' }}>네이버 로그인 완료!</h2>
           <p>
             이제 매물 검색을 시작할 수 있습니다.
             <br />

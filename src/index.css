@@ -1855,18 +1855,21 @@ input[type='range'].space-range:disabled {
   padding: 0 20px;
   border: 0;
   border-radius: 11px;
-  background: linear-gradient(120deg, var(--purple-2), var(--blue));
+  background: var(--blue);
   color: #fff;
   font-size: 16.5px;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  box-shadow: 0 10px 26px -10px rgba(139, 92, 246, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-  transition: transform 0.16s var(--ease), box-shadow 0.16s;
+  box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--blue) 60%, transparent),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  transition: transform 0.16s var(--ease), box-shadow 0.16s, filter 0.16s;
 }
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 16px 34px -10px rgba(139, 92, 246, 1), inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  filter: brightness(1.1);
+  box-shadow: 0 16px 34px -10px color-mix(in srgb, var(--blue) 75%, transparent),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 .btn-primary:disabled {
   opacity: 0.45;
@@ -2254,8 +2257,8 @@ input[type='range'].space-range:disabled {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #000;
+  background: var(--blue);
+  color: #fff;
   font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
@@ -2267,23 +2270,51 @@ input[type='range'].space-range:disabled {
   justify-content: center;
   margin-top: 8px;
 }
+/* 오프라인 화면 양쪽 버튼 크기 통일 */
+.nv-agent-actions .btn-primary,
+.nv-agent-actions .btn-outline {
+  height: 44px;
+  padding: 0 24px;
+  font-size: 15px;
+  border-radius: 11px;
+}
+.nv-agent-actions .btn-outline {
+  box-shadow: inset 0 0 0 1.5px var(--blue);
+  color: var(--blue);
+  background: transparent;
+}
+.nv-agent-actions .btn-outline:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--blue) 14%, transparent);
+}
 .nv-login-btn {
-  min-width: 200px;
+  min-width: 220px;
   height: 48px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--blue);
+  color: #fff;
   font-size: 16px;
   font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  /* btn-primary 그라데이션 오버라이드 → 테마 accent 단색 */
-  background: var(--accent);
-  color: #000;
-  box-shadow: 0 10px 26px -10px rgba(0, 212, 170, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--blue) 60%, transparent),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  transition: transform 0.16s, box-shadow 0.16s, filter 0.16s;
 }
 .nv-login-btn:hover:not(:disabled) {
-  background: var(--accent);
-  box-shadow: 0 16px 34px -10px rgba(0, 212, 170, 0.75), inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px -10px color-mix(in srgb, var(--blue) 75%, transparent),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+.nv-login-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .nv-login-spinner {
   width: 16px;
@@ -2311,8 +2342,8 @@ input[type='range'].space-range:disabled {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: rgba(0, 212, 170, 0.12);
-  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  border: 2px solid var(--blue);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2320,7 +2351,7 @@ input[type='range'].space-range:disabled {
 .nv-login-success-icon svg {
   width: 36px;
   height: 36px;
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .sort-icon {
@@ -3089,3 +3120,114 @@ input[type='range'].space-range:disabled {
 .eos-acct-logout:hover { color: var(--red); background: var(--red-dim); }
 .eos-acct-logout svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.8; fill: none; }
 .side-collapsed .eos-acct-logout { display: none; }
+
+/* ── 에이전트 설치 동의 모달 ─────────────────────────────── */
+.nv-install-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.nv-install-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.nv-install-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 0;
+}
+.nv-install-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.nv-install-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+.nv-install-close:hover { background: var(--surface-2); color: var(--fg); }
+.nv-install-close svg { width: 16px; height: 16px; }
+.nv-install-modal-body {
+  padding: 16px 20px 20px;
+}
+.nv-install-modal-body p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--fg-2);
+  line-height: 1.6;
+}
+.nv-install-list {
+  margin: 0 0 20px;
+  padding-left: 18px;
+  list-style: disc;
+}
+.nv-install-list li {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.nv-install-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.nv-install-action-btn {
+  min-width: 130px;
+}
+/* 다운로드 완료 상태 */
+.nv-install-done {
+  padding: 24px 20px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.nv-install-done-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--blue) 14%, transparent);
+  border: 2px solid var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue);
+}
+.nv-install-done-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.nv-install-done-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--blue);
+}
+.nv-install-done-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+}

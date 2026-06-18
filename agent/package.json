@@ -25,16 +25,25 @@
   "build": {
     "appId": "com.estateos.agent",
     "productName": "Estate-OS Agent",
+    "artifactName": "Estate-OS-Agent-Setup.${ext}",
     "directories": {
       "output": "release"
     },
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/tray-icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "installerLanguages": ["Korean"],
+      "language": "1042"
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/icon.icns"
+      "icon": "assets/tray-icon.png"
     },
     "files": [
       "dist/**/*",

@@ -48,13 +48,14 @@ export const FONT_OPTIONS: { key: FontFamilyKey; label: string; stack: string }[
 
 export const DEFAULT_SETTINGS: AppSettings = {
   themeMode: 'dark',
-  accent: { dark: '#4f8dff', light: '#2f6df6' },
+  accent: { dark: '#4f8dff', light: '#4f8dff' },
   fontFamily: 'pretendard',
   uiScale: 1,
   resultDensity: 'comfortable',
 };
 
-const STORAGE_KEY = 'app_settings';
+// v2: 기본 강조색을 라이트블루(#4f8dff)로 통일, 이전 저장값 자동 리셋
+const STORAGE_KEY = 'app_settings_v2';
 
 export function loadSettings(): AppSettings {
   try {

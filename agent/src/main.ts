@@ -4,15 +4,13 @@ import * as path from 'path';
 import { createServer, AGENT_PORT } from './server';
 import { hasCookies, clearAll, loadCookies } from './cookieStore';
 import { openNaverLoginWindow } from './naverLoginWindow';
+import { buildEIconPng } from './trayIcon';
 
 let tray: Tray | null = null;
 let httpServer: http.Server | null = null;
 
 function loadTrayIcon() {
-  const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
-  const img = nativeImage.createFromPath(iconPath);
-  // 시스템 트레이용 32×32 리사이즈
-  return img.resize({ width: 32, height: 32 });
+  return nativeImage.createFromBuffer(buildEIconPng());
 }
 
 function buildContextMenu(): Menu {
