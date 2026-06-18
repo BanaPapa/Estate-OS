@@ -1,65 +1,18 @@
-import { app, Tray, Menu, nativeImage, BrowserWindow, NativeImage } from 'electron';
+import { app, Tray, Menu, nativeImage, BrowserWindow } from 'electron';
 import * as http from 'http';
-import * as zlib from 'zlib';
+import * as path from 'path';
 import { createServer, AGENT_PORT } from './server';
-import { hasCookies, clearAll } from './cookieStore';
+import { hasCookies, clearAll, loadCookies } from './cookieStore';
 import { openNaverLoginWindow } from './naverLoginWindow';
 
 let tray: Tray | null = null;
 let httpServer: http.Server | null = null;
 
-// 16×16 단색 PNG를 런타임에 생성 (외부 아이콘 파일 불필요)
-function makeSolidPng(size: number, r: number, g: number, b: number): NativeImage {
-  const rowSize = 1 + size * 3; // filter byte + RGB×size
-  const raw = Buffer.alloc(size * rowSize);
-  for (let y = 0; y < size; y++) {
-    const base = y * rowSize;
-    raw[base] = 0; // filter: None
-    for (let x = 0; x < size; x++) {
-      raw[base + 1 + x * 3] = r;
-      raw[base + 1 + x * 3 + 1] = g;
-      raw[base + 1 + x * 3 + 2] = b;
-    }
-  }
-
-  const deflated = zlib.deflateSync(raw);
-
-  // CRC32 테이블
-  const tbl = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    tbl[i] = c;
-  }
-  const crc32 = (buf: Buffer): number => {
-    let c = 0xffffffff;
-    for (let i = 0; i < buf.length; i++) c = tbl[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-  };
-
-  const chunk = (type: string, data: Buffer): Buffer => {
-    const t = Buffer.from(type, 'ascii');
-    const len = Buffer.allocUnsafe(4);
-    len.writeUInt32BE(data.length, 0);
-    const crc = Buffer.allocUnsafe(4);
-    crc.writeUInt32BE(crc32(Buffer.concat([t, data])), 0);
-    return Buffer.concat([len, t, data, crc]);
-  };
-
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 2; // color type: RGB
-
-  const png = Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), // signature
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflated),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-
-  return nativeImage.createFromBuffer(png);
+function loadTrayIcon() {
+  const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
+  const img = nativeImage.createFromPath(iconPath);
+  // 시스템 트레이용 32×32 리사이즈
+  return img.resize({ width: 32, height: 32 });
 }
 
 function buildContextMenu(): Menu {
@@ -125,15 +78,22 @@ function startHttpServer(): void {
 }
 
 function createTray(): void {
-  // teal #00d4aa 아이콘
-  const icon = makeSolidPng(16, 0, 212, 170);
+  const icon = loadTrayIcon();
   tray = new Tray(icon);
-  tray.setToolTip('Estate-OS Agent — 로그인 필요');
+  const loginStatus = hasCookies() ? '로그인됨' : '로그인 필요';
+  tray.setToolTip(`Estate-OS Agent — ${loginStatus}`);
   tray.setContextMenu(buildContextMenu());
 }
 
 app.whenReady().then(() => {
   if (process.platform === 'darwin') app.dock.hide();
+
+  // 패키징된 앱에서만 Windows 자동 시작 등록
+  if (process.platform === 'win32' && app.isPackaged) {
+    app.setLoginItemSettings({ openAtLogin: true });
+  }
+
+  loadCookies(); // 디스크에서 저장된 쿠키 복구
   startHttpServer();
   createTray();
 });

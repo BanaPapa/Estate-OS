@@ -8,6 +8,7 @@ export function useAgentStatus() {
   const [cookieReady, setCookieReady] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginJustSucceeded, setLoginJustSucceeded] = useState(false);
 
   const check = useCallback(async () => {
     const agentSt = await pingAgent();
@@ -26,6 +27,9 @@ export function useAgentStatus() {
     try {
       await startNaverLogin();
       setCookieReady(true);
+      setLoginJustSucceeded(true);
+      // 5초 후 플래그 초기화 (성공 화면이 3.5초간 표시된 뒤)
+      setTimeout(() => setLoginJustSucceeded(false), 5000);
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : '로그인 중 오류가 발생했습니다.');
     } finally {
@@ -39,5 +43,5 @@ export function useAgentStatus() {
     return () => clearInterval(id);
   }, [check]);
 
-  return { status, cookieReady, loginLoading, loginError, recheck: check, triggerLogin };
+  return { status, cookieReady, loginLoading, loginError, loginJustSucceeded, recheck: check, triggerLogin };
 }

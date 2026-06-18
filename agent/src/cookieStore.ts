@@ -1,3 +1,7 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { app } from 'electron';
+
 interface Store {
   cookie: string;
   bearer: string;
@@ -6,12 +10,40 @@ interface Store {
 
 let store: Store = { cookie: '', bearer: '', loginDate: null };
 
+function storePath(): string {
+  return path.join(app.getPath('userData'), 'naver-cookies.json');
+}
+
+function persist(): void {
+  try {
+    fs.writeFileSync(storePath(), JSON.stringify(store, null, 2), 'utf-8');
+  } catch {
+    // read-only fs 또는 아직 ready 전 — 무시
+  }
+}
+
+export function loadCookies(): void {
+  try {
+    const raw = fs.readFileSync(storePath(), 'utf-8');
+    const data = JSON.parse(raw) as Partial<Store>;
+    store = {
+      cookie: data.cookie ?? '',
+      bearer: data.bearer ?? '',
+      loginDate: data.loginDate ?? null,
+    };
+  } catch {
+    // 파일 없음 또는 파싱 실패 — 새로 시작
+  }
+}
+
 export function setCookie(cookie: string): void {
   store = { ...store, cookie, loginDate: new Date().toISOString() };
+  persist();
 }
 
 export function setBearer(bearer: string): void {
   store = { ...store, bearer };
+  persist();
 }
 
 export function getCookie(): string {
@@ -32,4 +64,5 @@ export function getLoginDate(): string | null {
 
 export function clearAll(): void {
   store = { cookie: '', bearer: '', loginDate: null };
+  persist();
 }

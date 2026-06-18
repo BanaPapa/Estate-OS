@@ -5,8 +5,10 @@ const PARTITION = 'persist:naver';
 const LOGIN_URL =
   'https://nid.naver.com/nidlogin.login?mode=form&url=https%3A%2F%2Fland.naver.com%2F';
 
-// 로그인 후 새땅(new.land)에서 Bearer를 캡처할 때까지 대기하는 시간(ms)
-const BEARER_WAIT_MS = 6000;
+// Bearer 캡처 대기 시간 (new.land 로드 후)
+const BEARER_WAIT_MS = 2000;
+// 전체 최대 대기 시간 (3분)
+const MAX_WAIT_MS = 3 * 60 * 1000;
 
 export async function openNaverLoginWindow(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -25,6 +27,7 @@ export async function openNaverLoginWindow(): Promise<void> {
 
     const ses = session.fromPartition(PARTITION);
     let loginDetected = false;
+    let visitedLoginPage = false;
 
     // new.land API 요청에서 Authorization 헤더 인터셉트 → Bearer 캡처
     ses.webRequest.onBeforeSendHeaders(
@@ -43,6 +46,7 @@ export async function openNaverLoginWindow(): Promise<void> {
     const finishLogin = async (): Promise<void> => {
       if (loginDetected) return;
       loginDetected = true;
+      clearTimeout(maxTimer);
 
       // 쿠키 캡처
       const cookies = await ses.cookies.get({ domain: '.naver.com' });
@@ -54,29 +58,42 @@ export async function openNaverLoginWindow(): Promise<void> {
         win.loadURL('https://new.land.naver.com/houses');
       }
 
-      // Bearer 캡처를 위해 잠시 대기 후 창 닫기
+      // Bearer 캡처 후 창 닫기
       setTimeout(() => {
         if (!win.isDestroyed()) win.close();
         resolve();
       }, BEARER_WAIT_MS);
     };
 
-    // 네이버 로그인 성공 = land.naver.com으로 리디렉션
+    // 로그인 감지: nid.naver.com → 다른 곳으로 이동 = 로그인 완료
     win.webContents.on('did-navigate', (_event, url) => {
-      if (
-        (url.startsWith('https://land.naver.com') ||
-          url.startsWith('https://m.land.naver.com')) &&
-        !loginDetected
-      ) {
-        finishLogin();
+      if (loginDetected) return;
+
+      if (url.includes('nid.naver.com')) {
+        visitedLoginPage = true;
+        return;
+      }
+
+      // 로그인 페이지를 방문한 후 다른 도메인으로 이동 = 성공
+      if (visitedLoginPage) {
+        void finishLogin();
       }
     });
 
     win.on('closed', () => {
+      clearTimeout(maxTimer);
       if (!loginDetected) {
         reject(new Error('로그인 창이 닫혔습니다. 로그인을 완료한 뒤 다시 시도해 주세요.'));
       }
     });
+
+    // 최대 3분 타임아웃
+    const maxTimer = setTimeout(() => {
+      if (!win.isDestroyed()) win.close();
+      if (!loginDetected) {
+        reject(new Error('로그인 시간이 초과되었습니다 (3분). 다시 시도해 주세요.'));
+      }
+    }, MAX_WAIT_MS);
 
     win.loadURL(LOGIN_URL);
   });

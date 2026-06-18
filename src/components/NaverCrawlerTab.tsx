@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { SearchPanel } from './SearchPanel';
 import { Monitor } from './Monitor';
@@ -34,9 +34,25 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
     cookieReady,
     loginLoading,
     loginError,
+    loginJustSucceeded,
     recheck: recheckAgent,
     triggerLogin,
   } = useAgentStatus();
+
+  // 로그인 직후 성공 화면 표시 (3.5초)
+  const [showLoginSuccess, setShowLoginSuccess] = useState(false);
+  const prevLoginSucceeded = useRef(false);
+  useEffect(() => {
+    if (loginJustSucceeded && !prevLoginSucceeded.current) {
+      prevLoginSucceeded.current = true;
+      setShowLoginSuccess(true);
+      const t = setTimeout(() => setShowLoginSuccess(false), 3500);
+      return () => clearTimeout(t);
+    }
+    if (!loginJustSucceeded) {
+      prevLoginSucceeded.current = false;
+    }
+  }, [loginJustSucceeded]);
 
   // 에이전트 상태 변경 시 베이스 URL + 크롤 토큰 관리
   useEffect(() => {
@@ -115,48 +131,46 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
   // 에이전트 미실행 시 안내 화면 표시
   if (agentStatus === 'offline') {
     return (
-      <div className={`eos-work${ctrlCollapsed ? ' ctrl-collapsed' : ''}`}>
-        <div className="eos-view">
-          <div className="nv-agent-offline">
-            <div className="nv-agent-offline-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <circle cx="12" cy="12" r="9" />
-                <path d="M8 12h8M12 8v8" strokeLinecap="round" />
-              </svg>
+      <div className="eos-state-screen">
+        <div className="nv-agent-offline">
+          <div className="nv-agent-offline-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <circle cx="12" cy="12" r="9" />
+              <path d="M8 12h8M12 8v8" strokeLinecap="round" />
+            </svg>
+          </div>
+          <h2>로컬 에이전트가 실행되지 않고 있습니다</h2>
+          <p>
+            네이버 부동산 매물 검색은 사용자 PC에서 실행되는
+            <br />
+            <b>Estate-OS Agent</b> 프로그램을 통해 동작합니다.
+          </p>
+          <div className="nv-agent-steps">
+            <div className="nv-agent-step">
+              <span className="step-num">1</span>
+              <span>아래 버튼에서 에이전트를 다운로드합니다.</span>
             </div>
-            <h2>로컬 에이전트가 실행되지 않고 있습니다</h2>
-            <p>
-              네이버 부동산 매물 검색은 사용자 PC에서 실행되는
-              <br />
-              <b>Estate-OS Agent</b> 프로그램을 통해 동작합니다.
-            </p>
-            <div className="nv-agent-steps">
-              <div className="nv-agent-step">
-                <span className="step-num">1</span>
-                <span>아래 버튼에서 에이전트를 다운로드합니다.</span>
-              </div>
-              <div className="nv-agent-step">
-                <span className="step-num">2</span>
-                <span>설치 후 실행하면 트레이에 아이콘이 표시됩니다.</span>
-              </div>
-              <div className="nv-agent-step">
-                <span className="step-num">3</span>
-                <span>에이전트가 실행된 상태에서 아래 버튼을 누르세요.</span>
-              </div>
+            <div className="nv-agent-step">
+              <span className="step-num">2</span>
+              <span>설치 후 실행하면 트레이에 아이콘이 표시됩니다.</span>
             </div>
-            <div className="nv-agent-actions">
-              <a
-                className="btn-primary"
-                href="https://github.com/BanaPapa/Estate-OS/releases/latest"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                에이전트 다운로드
-              </a>
-              <button className="btn-outline" onClick={recheckAgent}>
-                연결 재시도
-              </button>
+            <div className="nv-agent-step">
+              <span className="step-num">3</span>
+              <span>에이전트가 실행된 상태에서 아래 버튼을 누르세요.</span>
             </div>
+          </div>
+          <div className="nv-agent-actions">
+            <a
+              className="btn-primary"
+              href="https://github.com/BanaPapa/Estate-OS/releases/latest"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              에이전트 다운로드
+            </a>
+            <button className="btn-outline" onClick={recheckAgent}>
+              연결 재시도
+            </button>
           </div>
         </div>
       </div>
@@ -166,46 +180,65 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
   // 에이전트 실행 중이지만 네이버 로그인 안 됨
   if (agentStatus === 'running' && !cookieReady) {
     return (
-      <div className={`eos-work${ctrlCollapsed ? ' ctrl-collapsed' : ''}`}>
-        <div className="eos-view">
-          <div className="nv-agent-offline">
-            <div className="nv-agent-offline-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 8v4l3 3" strokeLinecap="round" />
-              </svg>
-            </div>
-            <h2>네이버 로그인이 필요합니다</h2>
-            <p>
-              아래 버튼을 누르면 네이버 로그인 창이 열립니다.
-              <br />
-              <b>평소처럼 네이버에 로그인</b>하면 자동으로 연결됩니다.
-            </p>
-            {loginError && (
-              <div className="nv-login-error">{loginError}</div>
-            )}
-            <div className="nv-agent-actions">
-              <button
-                className="btn-primary nv-login-btn"
-                onClick={triggerLogin}
-                disabled={loginLoading}
-              >
-                {loginLoading ? (
-                  <>
-                    <span className="nv-login-spinner" />
-                    로그인 창 열림 — 네이버에 로그인해 주세요…
-                  </>
-                ) : (
-                  '네이버 로그인'
-                )}
-              </button>
-            </div>
-            {loginLoading && (
-              <p style={{ fontSize: 13 }}>
-                로그인 완료 후 창이 자동으로 닫힙니다. (최대 3분)
-              </p>
-            )}
+      <div className="eos-state-screen">
+        <div className="nv-agent-offline">
+          <div className="nv-agent-offline-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v4l3 3" strokeLinecap="round" />
+            </svg>
           </div>
+          <h2>네이버 로그인이 필요합니다</h2>
+          <p>
+            아래 버튼을 누르면 네이버 로그인 창이 열립니다.
+            <br />
+            <b>평소처럼 네이버에 로그인</b>하면 자동으로 연결됩니다.
+          </p>
+          {loginError && (
+            <div className="nv-login-error">{loginError}</div>
+          )}
+          <div className="nv-agent-actions">
+            <button
+              className="btn-primary nv-login-btn"
+              onClick={triggerLogin}
+              disabled={loginLoading}
+            >
+              {loginLoading ? (
+                <>
+                  <span className="nv-login-spinner" />
+                  로그인 창 열림 — 네이버에 로그인해 주세요…
+                </>
+              ) : (
+                '네이버 로그인'
+              )}
+            </button>
+          </div>
+          {loginLoading && (
+            <p style={{ fontSize: 13 }}>
+              로그인 완료 후 창이 자동으로 닫힙니다. (최대 3분)
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 로그인 직후 성공 안내 (3.5초)
+  if (agentStatus === 'running' && cookieReady && showLoginSuccess) {
+    return (
+      <div className="eos-state-screen">
+        <div className="nv-agent-offline">
+          <div className="nv-login-success-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          <h2 style={{ color: 'var(--accent)' }}>네이버 로그인 완료!</h2>
+          <p>
+            이제 매물 검색을 시작할 수 있습니다.
+            <br />
+            <span style={{ fontSize: 13 }}>잠시 후 검색 화면으로 전환됩니다…</span>
+          </p>
         </div>
       </div>
     );
