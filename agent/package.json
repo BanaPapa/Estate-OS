@@ -37,9 +37,7 @@
       "oneClick": true,
       "perMachine": false,
       "createDesktopShortcut": false,
-      "createStartMenuShortcut": true,
-      "installerLanguages": ["Korean"],
-      "language": "1042"
+      "createStartMenuShortcut": true
     },
     "mac": {
       "target": "dmg",
