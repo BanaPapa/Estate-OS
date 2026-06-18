@@ -51,16 +51,13 @@ export function buildEIconPng(): Buffer {
       if (!inRoundedRect(x, y, W, H, 5)) continue;
 
       if (isEPixel(x, y)) {
-        // Blue (#4f8dff) → teal (#00d4aa) gradient top-to-bottom within E bounds
-        const t = Math.max(0, Math.min(1, (y - 9) / 13));
-        pixelData[i]     = Math.round(0x4f * (1 - t));
-        pixelData[i + 1] = Math.round(0x8d * (1 - t) + 0xd4 * t);
-        pixelData[i + 2] = Math.round(0xff * (1 - t) + 0xaa * t);
-        pixelData[i + 3] = 0xff;
+        // Blue (#1a6ef5) — high contrast on white
+        pixelData[i] = 0x1a; pixelData[i + 1] = 0x6e;
+        pixelData[i + 2] = 0xf5; pixelData[i + 3] = 0xff;
       } else {
-        // Dark background
-        pixelData[i] = 0x0d; pixelData[i + 1] = 0x11;
-        pixelData[i + 2] = 0x17; pixelData[i + 3] = 0xff;
+        // White background — clearly visible in dark taskbar tray
+        pixelData[i] = 0xff; pixelData[i + 1] = 0xff;
+        pixelData[i + 2] = 0xff; pixelData[i + 3] = 0xff;
       }
     }
   }
