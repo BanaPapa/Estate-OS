@@ -86,9 +86,10 @@ function createTray(): void {
 app.whenReady().then(() => {
   if (process.platform === 'darwin') app.dock.hide();
 
-  // 패키징된 앱에서만 Windows 자동 시작 등록
   if (process.platform === 'win32' && app.isPackaged) {
     app.setLoginItemSettings({ openAtLogin: true });
+    // 웹앱에서 estate-os-agent://launch 호출 시 자동 실행 지원
+    app.setAsDefaultProtocolClient('estate-os-agent');
   }
 
   loadCookies(); // 디스크에서 저장된 쿠키 복구

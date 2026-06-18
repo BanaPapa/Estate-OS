@@ -8,7 +8,7 @@ import { SlotModal } from './SlotModal';
 import { InfoModal } from './InfoModal';
 import { useCrawler } from '../hooks/useCrawler';
 import { useSlots } from '../hooks/useSlots';
-import { useAgentStatus } from '../hooks/useAgentStatus';
+import type { AgentStatusHook } from '../hooks/useAgentStatus';
 import { CrawlerConfig, SavedSlot } from '../types';
 import { AreaUnit, PriceUnit } from '../services/api';
 import { setNaverBases, setNaverCrawlToken } from '../services/naverApi';
@@ -18,12 +18,13 @@ interface NaverCrawlerTabProps {
   crawler: ReturnType<typeof useCrawler>;
   slots: ReturnType<typeof useSlots>;
   session: Session | null;
+  agentStatus: AgentStatusHook;
 }
 
 const AGENT_DOWNLOAD_URL =
   'https://github.com/BanaPapa/Estate-OS/releases/latest/download/Estate-OS-Agent-Setup.exe';
 
-export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProps) {
+export function NaverCrawlerTab({ crawler, slots, session, agentStatus }: NaverCrawlerTabProps) {
   const { state, start, stop, skipDong, reset, clearLogs, load } = crawler;
   const [searchKey, setSearchKey] = useState(0);
   const [areaUnit, setAreaUnit] = useState<AreaUnit>('sqm');
@@ -35,15 +36,18 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
   const [showInstallModal, setShowInstallModal] = useState(false);
   const [installDone, setInstallDone] = useState(false);
   const {
-    status: agentStatus,
+    status: agentRunStatus,
     cookieReady,
-    bearerReady,
+    connectionValid,
+    launching,
+    launchFailed,
     loginLoading,
     loginError,
     loginJustSucceeded,
     recheck: recheckAgent,
+    launchAndWait,
     triggerLogin,
-  } = useAgentStatus();
+  } = agentStatus;
 
   // 로그인 직후 성공 화면 표시 (3.5초)
   const [showLoginSuccess, setShowLoginSuccess] = useState(false);
@@ -62,7 +66,7 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
 
   // 에이전트 상태 변경 시 베이스 URL + 크롤 토큰 관리
   useEffect(() => {
-    const agentRunning = agentStatus === 'running';
+    const agentRunning = agentRunStatus === 'running';
     setNaverBases(agentRunning);
 
     if (agentRunning && session?.access_token) {
@@ -75,7 +79,7 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
     } else {
       setNaverCrawlToken(null);
     }
-  }, [agentStatus, session]);
+  }, [agentRunStatus, session]);
 
   const handleInstallConsent = () => {
     setInstallDone(true);
@@ -145,7 +149,7 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
   const showEmptyState = state.status === 'idle';
 
   // 에이전트 미실행 시 안내 화면 표시
-  if (agentStatus === 'offline') {
+  if (agentRunStatus === 'offline') {
     return (
       <div className="eos-state-screen">
         <div className="nv-agent-offline">
@@ -168,14 +172,32 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width={14} height={14}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
               이미 설치되어 있다면
             </div>
-            <p className="nv-agent-path-desc">
-              시작 메뉴에서 <b>Estate-OS Agent</b>를 검색해 실행하거나,
-              <br />바탕화면 또는 작업 표시줄 아이콘을 클릭하세요.
-            </p>
-            <button className="btn-primary" onClick={recheckAgent}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width={14} height={14} style={{ marginRight: 6 }}><path d="M23 4v6h-6M1 20v-6h6" /><path d="M20.5 8.5A9 9 0 1 0 21 12" /></svg>
-              실행 후 연결 재시도
-            </button>
+            {launching ? (
+              <div className="nv-launching-state">
+                <span className="nv-login-spinner" />
+                에이전트를 시작하는 중입니다… (최대 15초)
+              </div>
+            ) : launchFailed ? (
+              <>
+                <p className="nv-agent-path-desc">
+                  자동 실행에 실패했습니다. 시작 메뉴에서 <b>Estate-OS Agent</b>를 직접 실행한 뒤 아래 버튼을 눌러 주세요.
+                </p>
+                <button className="btn-primary" onClick={recheckAgent}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width={14} height={14} style={{ marginRight: 6 }}><path d="M23 4v6h-6M1 20v-6h6" /><path d="M20.5 8.5A9 9 0 1 0 21 12" /></svg>
+                  연결 재시도
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="nv-agent-path-desc">
+                  버튼을 누르면 설치된 에이전트를 자동으로 찾아 실행합니다.
+                </p>
+                <button className="btn-primary" onClick={launchAndWait}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width={14} height={14} style={{ marginRight: 6 }}><path d="M5 3l14 9-14 9V3z"/></svg>
+                  에이전트 자동 실행
+                </button>
+              </>
+            )}
           </div>
 
           <div className="nv-agent-path-divider">
@@ -288,7 +310,7 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
   }
 
   // 에이전트 실행 중이지만 네이버 로그인 안 됨
-  if (agentStatus === 'running' && !cookieReady) {
+  if (agentRunStatus === 'running' && !cookieReady) {
     return (
       <div className="eos-state-screen">
         <div className="nv-agent-offline">
@@ -343,7 +365,7 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
   }
 
   // 로그인 직후 성공 안내 (3.5초)
-  if (agentStatus === 'running' && cookieReady && showLoginSuccess) {
+  if (agentRunStatus === 'running' && cookieReady && showLoginSuccess) {
     return (
       <div className="eos-state-screen">
         <div className="nv-agent-offline">
@@ -373,11 +395,10 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
       />
 
       <main className="eos-view">
-        {cookieReady && !bearerReady && (
+        {connectionValid === false && (
           <div className="nv-bearer-warn nv-bearer-warn--action">
             <div className="nv-bearer-warn-text">
-              <b>네이버 연결 정보가 불완전합니다.</b>
-              {' '}로그인 창을 일찍 닫으셨나요? 일부 매물(new.land) 검색이 실패할 수 있습니다.
+              인증 토큰이 만료되어 재로그인으로 토큰을 갱신해야 할 수 있습니다.
             </div>
             <button
               className="nv-bearer-relogin-btn"

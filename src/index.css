@@ -1104,6 +1104,11 @@ body {
   letter-spacing: 0.04em;
   margin-left: 2px;
 }
+.eos-crumb .tag--warn {
+  background: rgba(255, 160, 0, 0.15);
+  color: #ffaa00;
+  border: 1px solid rgba(255, 160, 0, 0.35);
+}
 .eos-hdr-right {
   display: flex;
   align-items: center;
@@ -2437,6 +2442,14 @@ input[type='range'].space-range:disabled {
   flex-shrink: 0;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.nv-launching-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--txt-2);
+  font-size: 13px;
+  padding: 10px 0 4px;
+}
 .nv-login-error {
   background: rgba(255, 80, 80, 0.12);
   border: 1px solid rgba(255, 80, 80, 0.4);

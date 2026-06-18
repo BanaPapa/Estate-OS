@@ -9,11 +9,13 @@ import { useCrawler } from './hooks/useCrawler';
 import { useSlots } from './hooks/useSlots';
 import { useSettings } from './hooks/useSettings';
 import { useAuth } from './hooks/useAuth';
+import { useAgentStatus } from './hooks/useAgentStatus';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('naver');
   const [sideCollapsed, setSideCollapsed] = useState(false);
   const auth = useAuth();
+  const agentStatus = useAgentStatus();
   const crawler = useCrawler();
   const slots = useSlots(auth.user?.id ?? null);
   const { settings, update, setAccent } = useSettings();
@@ -86,7 +88,11 @@ export default function App() {
               <path d="M9 6l6 6-6 6" />
             </svg>
             <b>{isAdminTab ? '회원 승인' : isSettings ? '인증 설정' : '매물시세'}</b>
-            {!isSettings && !isAdminTab && <span className="tag">LIVE</span>}
+            {!isSettings && !isAdminTab && agentStatus.status === 'running' && (
+              agentStatus.connectionValid === false
+                ? <span className="tag tag--warn">재연결 필요</span>
+                : <span className="tag">LIVE</span>
+            )}
           </div>
 
           {!isSettings && !isAdminTab && (
@@ -102,7 +108,7 @@ export default function App() {
         {/* 매물시세 탭은 항상 마운트 상태로 두고 다른 탭일 때만 숨긴다.
             (언마운트하면 단위/지역/필터 등 로컬 선택 상태가 초기화되는 문제 방지) */}
         <div style={{ display: isSettings || isAdminTab ? 'none' : 'contents' }}>
-          <NaverCrawlerTab crawler={crawler} slots={slots} session={auth.session} />
+          <NaverCrawlerTab crawler={crawler} slots={slots} session={auth.session} agentStatus={agentStatus} />
         </div>
         {isAdminTab && isAdmin && <MemberApproval />}
         {isSettings && (

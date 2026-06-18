@@ -88,6 +88,29 @@ export async function getCookieStatus(): Promise<CookieStatus> {
   }
 }
 
+// 커스텀 프로토콜로 에이전트 자동 실행 시도 (패키징된 설치본에서 동작)
+export function tryLaunchAgent(): void {
+  const a = document.createElement('a');
+  a.href = 'estate-os-agent://launch';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { if (a.parentNode) a.parentNode.removeChild(a); }, 200);
+}
+
+// 실제 Naver API 호출로 쿠키 유효성 검증 (오탐 방지: 오류 시 true 반환)
+export async function validateConnection(): Promise<boolean> {
+  try {
+    const res = await fetch(`${AGENT_BASE}/validate`, {
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!res.ok) return true; // agent 오류 = 불확정
+    const data = (await res.json()) as { valid: boolean; inconclusive?: boolean };
+    return data.valid !== false;
+  } catch {
+    return true; // agent 오프라인 = 불확정
+  }
+}
+
 // 로그인 창을 열고 사용자가 로그인 완료할 때까지 대기 (최대 3분)
 export async function startNaverLogin(): Promise<void> {
   const res = await fetch(`${AGENT_BASE}/naver-login`, {

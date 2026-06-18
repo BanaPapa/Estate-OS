@@ -125,6 +125,39 @@ export function createServer(): express.Application {
     res.json({ hasCookies: hasCookies(), hasBearer: getBearer() !== '', loginDate: getLoginDate() });
   });
 
+  // 실제 Naver API 호출로 쿠키 유효성 검증
+  // 401 = 토큰 만료, 그 외 오류 = 불확정(오탐 방지)
+  app.get('/validate', async (_req: Request, res: Response) => {
+    if (!hasCookies()) {
+      res.json({ valid: false, reason: 'no-cookie' });
+      return;
+    }
+    try {
+      const r = await fetch(
+        'https://fin.land.naver.com/front-api/v1/search/autocomplete/complexes?keyword=%EA%B0%95%EB%82%A8&size=1&page=0',
+        {
+          headers: {
+            Cookie: getCookie(),
+            Referer: 'https://fin.land.naver.com/map',
+            Origin: 'https://fin.land.naver.com',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+            Accept: 'application/json, text/plain, */*',
+            'Accept-Language': 'ko-KR,ko;q=0.9',
+          },
+          signal: AbortSignal.timeout(6000),
+        },
+      );
+      if (r.status === 401) {
+        res.json({ valid: false, reason: 'cookie-expired' });
+      } else {
+        res.json({ valid: true });
+      }
+    } catch {
+      // 네트워크 오류 등 — 오탐 방지를 위해 유효로 처리
+      res.json({ valid: true, inconclusive: true });
+    }
+  });
+
   // 네이버 로그인 창 열기 (로그인 완료 또는 창 닫힘까지 대기)
   app.post('/naver-login', (_req: Request, res: Response) => {
     openNaverLoginWindow()

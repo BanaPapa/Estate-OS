@@ -1,12 +1,40 @@
 import { useState, useEffect, useCallback } from 'react';
-import { pingAgent, getCookieStatus, startNaverLogin, AgentStatus, CookieStatus } from '../services/agentApi';
+import {
+  pingAgent,
+  getCookieStatus,
+  startNaverLogin,
+  validateConnection,
+  tryLaunchAgent,
+  AgentStatus,
+  CookieStatus,
+} from '../services/agentApi';
 
 const POLL_INTERVAL_MS = 10_000;
+// 10분마다 실제 Naver API 호출로 토큰 유효성 검증
+const VALIDATE_INTERVAL_MS = 600_000;
 
-export function useAgentStatus() {
+export interface AgentStatusHook {
+  status: AgentStatus;
+  cookieReady: boolean;
+  bearerReady: boolean;
+  connectionValid: boolean | null;
+  launching: boolean;
+  launchFailed: boolean;
+  loginLoading: boolean;
+  loginError: string | null;
+  loginJustSucceeded: boolean;
+  recheck: () => Promise<CookieStatus | null>;
+  launchAndWait: () => Promise<void>;
+  triggerLogin: () => Promise<void>;
+}
+
+export function useAgentStatus(): AgentStatusHook {
   const [status, setStatus] = useState<AgentStatus>('unknown');
   const [cookieReady, setCookieReady] = useState(false);
   const [bearerReady, setBearerReady] = useState(false);
+  const [connectionValid, setConnectionValid] = useState<boolean | null>(null);
+  const [launching, setLaunching] = useState(false);
+  const [launchFailed, setLaunchFailed] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginJustSucceeded, setLoginJustSucceeded] = useState(false);
@@ -22,36 +50,84 @@ export function useAgentStatus() {
     } else {
       setCookieReady(false);
       setBearerReady(false);
+      setConnectionValid(null);
       return null;
     }
   }, []);
 
-  const triggerLogin = useCallback(async () => {
+  const validate = useCallback(async (): Promise<void> => {
+    const agentSt = await pingAgent();
+    if (agentSt !== 'running') return;
+    const cs = await getCookieStatus();
+    if (!cs.hasCookies) return;
+    const valid = await validateConnection();
+    setConnectionValid(valid);
+  }, []);
+
+  // 커스텀 프로토콜로 에이전트 자동 실행, 최대 16초 폴링
+  const launchAndWait = useCallback(async (): Promise<void> => {
+    setLaunching(true);
+    setLaunchFailed(false);
+    tryLaunchAgent();
+    for (let i = 0; i < 8; i++) {
+      await new Promise<void>((r) => setTimeout(r, 2000));
+      const agentSt = await pingAgent();
+      if (agentSt === 'running') {
+        await check();
+        await validate();
+        setLaunching(false);
+        return;
+      }
+    }
+    setLaunching(false);
+    setLaunchFailed(true);
+  }, [check, validate]);
+
+  const triggerLogin = useCallback(async (): Promise<void> => {
     setLoginLoading(true);
     setLoginError(null);
     try {
       await startNaverLogin();
-      // 실제 상태를 에이전트에서 확인 — bearer 캡처 여부를 정확히 반영
       const cs = await check();
-      // 쿠키와 bearer 모두 정상일 때만 성공 화면 표시.
-      // bearer 미캡처(창 조기 닫힘 등) 시에는 성공 화면 없이 검색 화면으로 가고
-      // bearer 경고 배너가 뜨면서 재로그인 버튼이 안내함.
       if (cs?.hasCookies && cs?.hasBearer) {
         setLoginJustSucceeded(true);
         setTimeout(() => setLoginJustSucceeded(false), 5000);
       }
+      await validate();
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : '로그인 중 오류가 발생했습니다.');
     } finally {
       setLoginLoading(false);
     }
-  }, [check]);
+  }, [check, validate]);
 
+  // 에이전트 실행 여부 10초마다 감지
   useEffect(() => {
-    check();
+    void check();
     const id = setInterval(check, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [check]);
 
-  return { status, cookieReady, bearerReady, loginLoading, loginError, loginJustSucceeded, recheck: check, triggerLogin };
+  // 에이전트 실행 + 쿠키 있을 때만 10분마다 실제 토큰 검증
+  useEffect(() => {
+    if (status !== 'running' || !cookieReady) return;
+    void validate();
+    const id = setInterval(validate, VALIDATE_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [status, cookieReady, validate]);
+
+  return {
+    status,
+    cookieReady,
+    bearerReady,
+    connectionValid,
+    launching,
+    launchFailed,
+    loginLoading,
+    loginError,
+    loginJustSucceeded,
+    recheck: check,
+    launchAndWait,
+    triggerLogin,
+  };
 }
