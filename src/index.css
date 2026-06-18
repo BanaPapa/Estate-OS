@@ -2297,6 +2297,7 @@ input[type='range'].space-range:disabled {
   flex-direction: column;
   gap: 16px;
   width: 100%;
+  margin-top: 24px;
 }
 .nv-agent-path-section {
   display: flex;
@@ -2345,12 +2346,13 @@ input[type='range'].space-range:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 50px;
-  padding: 0 28px;
-  font-size: 17px;
-  border-radius: 10px;
+  height: 58px;
+  padding: 0 32px;
+  font-size: 20px;
+  font-weight: 700;
+  border-radius: 12px;
   white-space: nowrap;
-  min-width: 180px;
+  min-width: 200px;
 }
 .nv-agent-path-install .btn-outline {
   box-shadow: inset 0 0 0 1.5px var(--border);

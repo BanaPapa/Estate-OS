@@ -203,7 +203,7 @@ export function NaverCrawlerTab({ crawler, slots, session, agentStatus }: NaverC
                 <p className="nv-agent-path-desc">
                   {launchFailed
                     ? '최신 버전은 자동 실행을 지원합니다. 재설치 후 버튼 한 번으로 연결됩니다.'
-                    : '아래 버튼을 눌러 에이전트를 다운로드하고 설치하세요. 설치가 완료되면 트레이 아이콘이 자동으로 나타납니다.'}
+                    : <>아래 버튼을 눌러 에이전트를 다운로드하고 설치하세요.<br />설치가 완료되면 트레이 아이콘이 자동으로 나타납니다.</>}
                 </p>
               </div>
               <div className="nv-agent-path-action">
