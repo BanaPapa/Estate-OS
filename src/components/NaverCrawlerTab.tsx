@@ -155,41 +155,51 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
               <path d="M8 12h8M12 8v8" strokeLinecap="round" />
             </svg>
           </div>
-          <h2>로컬 에이전트가 실행되지 않고 있습니다</h2>
+          <h2>에이전트가 실행되지 않고 있습니다</h2>
           <p>
-            네이버 부동산 매물 검색은 사용자 PC에서 실행되는
+            네이버 부동산 매물 검색은 이 PC에서 실행 중인
             <br />
-            <b>Estate-OS Agent</b> 프로그램을 통해 동작합니다.
+            <b>Estate-OS Agent</b>를 통해서만 동작합니다.
           </p>
-          <div className="nv-agent-steps">
-            <div className="nv-agent-step">
-              <span className="step-num">1</span>
-              <span>아래 버튼을 눌러 에이전트를 설치합니다.</span>
+
+          {/* 이미 설치된 경우 */}
+          <div className="nv-agent-path-section">
+            <div className="nv-agent-path-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width={14} height={14}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              이미 설치되어 있다면
             </div>
-            <div className="nv-agent-step">
-              <span className="step-num">2</span>
-              <span>설치가 완료되면 트레이에 아이콘이 표시됩니다.</span>
-            </div>
-            <div className="nv-agent-step">
-              <span className="step-num">3</span>
-              <span>에이전트가 실행 중일 때 아래 재시도 버튼을 누르세요.</span>
-            </div>
-          </div>
-          <div className="nv-agent-actions">
-            <button className="btn-primary" onClick={() => setShowInstallModal(true)}>
-              에이전트 설치
+            <p className="nv-agent-path-desc">
+              시작 메뉴에서 <b>Estate-OS Agent</b>를 검색해 실행하거나,
+              <br />바탕화면 또는 작업 표시줄 아이콘을 클릭하세요.
+            </p>
+            <button className="btn-primary" onClick={recheckAgent}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width={14} height={14} style={{ marginRight: 6 }}><path d="M23 4v6h-6M1 20v-6h6" /><path d="M20.5 8.5A9 9 0 1 0 21 12" /></svg>
+              실행 후 연결 재시도
             </button>
-            <button className="btn-outline" onClick={recheckAgent}>
-              연결 재시도
+          </div>
+
+          <div className="nv-agent-path-divider">
+            <span>처음 설치하는 경우</span>
+          </div>
+
+          {/* 처음 설치 */}
+          <div className="nv-agent-path-section nv-agent-path-install">
+            <p className="nv-agent-path-desc">
+              아래 버튼을 눌러 에이전트를 다운로드하고 설치하세요.
+              <br />설치가 완료되면 트레이 아이콘이 자동으로 나타납니다.
+            </p>
+            <button className="btn-outline" onClick={() => setShowInstallModal(true)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width={14} height={14} style={{ marginRight: 6 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              에이전트 다운로드
             </button>
           </div>
         </div>
 
         {showInstallModal && (
           <div className="nv-install-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleCloseInstallModal(); }}>
-            <div className="nv-install-modal">
+            <div className="nv-install-modal nv-install-modal--wide">
               <div className="nv-install-modal-header">
-                <h3>Estate-OS Agent 설치</h3>
+                <h3>Estate-OS Agent 설치 안내</h3>
                 <button className="nv-install-close" onClick={handleCloseInstallModal} aria-label="닫기">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
@@ -206,9 +216,11 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
                   </div>
                   <p className="nv-install-done-title">다운로드가 시작되었습니다!</p>
                   <p className="nv-install-done-desc">
-                    파일 다운로드가 완료되면 실행해 주세요.
-                    <br />
-                    클릭 한 번으로 설치가 자동 완료됩니다.
+                    다운로드한 파일(<b>Estate-OS-Agent-Setup.exe</b>)을 실행하면
+                    <br />클릭 한 번으로 설치가 완료됩니다.
+                    <br /><br />
+                    설치 후 트레이 아이콘이 뜨면 이 화면으로 돌아와
+                    <br /><b>연결 재시도</b>를 눌러 주세요.
                   </p>
                   <button className="btn-primary nv-install-action-btn" onClick={handleCloseInstallModal}>
                     확인
@@ -216,16 +228,54 @@ export function NaverCrawlerTab({ crawler, slots, session }: NaverCrawlerTabProp
                 </div>
               ) : (
                 <div className="nv-install-modal-body">
-                  <p>이 PC에 <b>Estate-OS Agent</b>를 설치합니다.</p>
-                  <ul className="nv-install-list">
-                    <li>설치 위치: 현재 사용자 앱 폴더 (관리자 권한 불필요)</li>
-                    <li>Windows 시작 시 자동 실행 (트레이 상주)</li>
-                    <li>네이버 부동산 요청을 로컬 IP로 중계</li>
-                  </ul>
+                  <p className="nv-install-intro">
+                    설치 전에 아래 내용을 꼭 읽어 주세요.
+                  </p>
+
+                  <div className="nv-install-cards">
+                    <div className="nv-install-card">
+                      <div className="nv-install-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 12l2 2 4-4"/></svg>
+                      </div>
+                      <div>
+                        <div className="nv-install-card-title">이 프로그램은 무엇인가요?</div>
+                        <div className="nv-install-card-desc">
+                          PC 배경에서 조용히 실행되는 소형 도우미 프로그램입니다. 웹사이트에서 네이버 부동산 데이터를 조회할 때, 이 PC를 통해 대신 요청을 보내줍니다.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="nv-install-card">
+                      <div className="nv-install-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      </div>
+                      <div>
+                        <div className="nv-install-card-title">내 정보는 안전한가요?</div>
+                        <div className="nv-install-card-desc">
+                          네이버 로그인 쿠키는 <b>이 PC에만 저장</b>되며, 외부 서버로 전송되지 않습니다. 이 프로그램은 네이버 부동산 외 다른 사이트에 접근하지 않습니다.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="nv-install-card">
+                      <div className="nv-install-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      </div>
+                      <div>
+                        <div className="nv-install-card-title">어디에 설치되나요?</div>
+                        <div className="nv-install-card-desc">
+                          <b>관리자 권한 불필요</b> — 현재 사용자 폴더에 설치됩니다.<br/>
+                          Windows 시작 시 자동 실행되며 트레이에 아이콘으로 상주합니다.<br/>
+                          삭제: 설정 → 앱 → Estate-OS Agent → 제거
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="nv-install-modal-actions">
                     <button className="btn-outline" onClick={handleCloseInstallModal}>취소</button>
                     <button className="btn-primary nv-install-action-btn" onClick={handleInstallConsent}>
-                      동의하고 설치
+                      이해했습니다 — 다운로드
                     </button>
                   </div>
                 </div>

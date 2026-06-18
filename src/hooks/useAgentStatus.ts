@@ -29,17 +29,17 @@ export function useAgentStatus() {
     setLoginError(null);
     try {
       await startNaverLogin();
-      setCookieReady(true);
-      setBearerReady(true);
+      // 낙관적 업데이트 대신 실제 상태를 에이전트에서 확인
+      // (bearer 캡처 여부를 정확히 반영하기 위해)
+      await check();
       setLoginJustSucceeded(true);
-      // 5초 후 플래그 초기화 (성공 화면이 3.5초간 표시된 뒤)
       setTimeout(() => setLoginJustSucceeded(false), 5000);
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : '로그인 중 오류가 발생했습니다.');
     } finally {
       setLoginLoading(false);
     }
-  }, []);
+  }, [check]);
 
   useEffect(() => {
     check();

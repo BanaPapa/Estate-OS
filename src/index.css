@@ -2286,6 +2286,117 @@ input[type='range'].space-range:disabled {
 .nv-agent-actions .btn-outline:hover:not(:disabled) {
   background: color-mix(in srgb, var(--blue) 14%, transparent);
 }
+
+/* ── 에이전트 오프라인: 두 경로 (재실행 / 신규설치) ── */
+.nv-agent-path-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 460px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 22px;
+}
+.nv-agent-path-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.nv-agent-path-desc {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 0;
+  text-align: center;
+}
+.nv-agent-path-desc b { color: var(--fg); }
+.nv-agent-path-section .btn-primary,
+.nv-agent-path-section .btn-outline {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 20px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+.nv-agent-path-install .btn-outline {
+  box-shadow: inset 0 0 0 1.5px var(--border);
+  color: var(--fg-2);
+}
+.nv-agent-path-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 460px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.nv-agent-path-divider::before,
+.nv-agent-path-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── 에이전트 설치 모달 (확장) ── */
+.nv-install-modal--wide {
+  max-width: 520px;
+  width: 100%;
+}
+.nv-install-intro {
+  font-size: 13px !important;
+  color: var(--muted) !important;
+  margin: 0 0 14px !important;
+}
+.nv-install-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.nv-install-card {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.nv-install-card-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.nv-install-card-icon svg { width: 18px; height: 18px; }
+.nv-install-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 4px;
+}
+.nv-install-card-desc {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.nv-install-card-desc b { color: var(--fg-2); }
+
 .nv-login-btn {
   min-width: 220px;
   height: 48px;

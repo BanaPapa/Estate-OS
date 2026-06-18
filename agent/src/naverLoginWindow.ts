@@ -1,12 +1,14 @@
 import { BrowserWindow, session } from 'electron';
-import { setCookie, setBearer } from './cookieStore';
+import { setCookie, setBearer, getBearer } from './cookieStore';
 
 const PARTITION = 'persist:naver';
 const LOGIN_URL =
   'https://nid.naver.com/nidlogin.login?mode=form&url=https%3A%2F%2Fland.naver.com%2F';
 
-// Bearer 캡처 대기 시간 (new.land 로드 후)
-const BEARER_WAIT_MS = 2000;
+// Bearer 캡처 폴링 간격
+const BEARER_POLL_MS = 300;
+// Bearer 캡처 최대 대기 시간 (10초) — new.land 콜드 로드 대비
+const BEARER_MAX_WAIT_MS = 10_000;
 // 전체 최대 대기 시간 (3분)
 const MAX_WAIT_MS = 3 * 60 * 1000;
 
@@ -53,16 +55,28 @@ export async function openNaverLoginWindow(): Promise<void> {
       const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
       setCookie(cookieStr);
 
-      // new.land로 이동해 Bearer 토큰 유발
+      // new.land로 이동해 Bearer 토큰 유발 (onBeforeSendHeaders 인터셉터가 캡처)
       if (!win.isDestroyed()) {
         win.loadURL('https://new.land.naver.com/houses');
       }
 
-      // Bearer 캡처 후 창 닫기
-      setTimeout(() => {
+      // Bearer가 실제로 캡처될 때까지 폴링 — 고정 타임아웃 2초 대신 최대 10초 대기
+      // new.land 페이지가 콜드 로드일 때 API 호출이 2초를 넘는 경우가 있어서
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearInterval(bearerPoll);
+        clearTimeout(bearerTimeout);
         if (!win.isDestroyed()) win.close();
         resolve();
-      }, BEARER_WAIT_MS);
+      };
+
+      const bearerPoll = setInterval(() => {
+        if (getBearer()) finish();
+      }, BEARER_POLL_MS);
+
+      const bearerTimeout = setTimeout(finish, BEARER_MAX_WAIT_MS);
     };
 
     // 로그인 감지: nid.naver.com → 다른 곳으로 이동 = 로그인 완료
