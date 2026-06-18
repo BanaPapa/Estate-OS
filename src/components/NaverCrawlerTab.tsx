@@ -295,7 +295,7 @@ export function NaverCrawlerTab({ crawler, slots, session, agentStatus }: NaverC
                   <div className="nv-install-modal-actions">
                     <button className="btn-outline" onClick={handleCloseInstallModal}>취소</button>
                     <button className="btn-primary nv-install-action-btn" onClick={handleInstallConsent}>
-                      이해했습니다 — 다운로드
+                      이해했습니다
                     </button>
                   </div>
                 </div>
