@@ -739,7 +739,7 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
             value={filterText} onChange={(e) => { setFilterText(e.target.value); setPage(0); }} />
 
           <button className="btn-outline btn-sm"
-            onClick={() => void exportExcel(allFiltered, priceUnit, areaUnit, realEstateType, buildExportBaseName(meta, allFiltered.length))}
+            onClick={() => void exportExcel(allFiltered, priceUnit, areaUnit, realEstateType, buildExportBaseName(meta, allFiltered.length), detailCacheRef.current)}
             disabled={allFiltered.length === 0}>
             Excel 내보내기
           </button>

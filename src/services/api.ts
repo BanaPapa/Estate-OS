@@ -1,4 +1,5 @@
-import { Property, DIRECTION_LABELS, TRADE_TYPE_LABELS, isExclusiveSpaceType, SavedSlot, SearchMeta } from '../types';
+import { Property, DIRECTION_LABELS, TRADE_TYPE_LABELS, isExclusiveSpaceType, isPresaleType, SavedSlot, SearchMeta } from '../types';
+import { ArticleDetailResult } from './naverApi';
 import ExcelJS from 'exceljs';
 
 // =============================================
@@ -50,6 +51,14 @@ export function pyeongUnitPriceWon(p: Property, realEstateType: string): number 
 // Excel 내보내기
 // =============================================
 
+type DetailMap = Map<string, ArticleDetailResult | 'loading' | 'error'>;
+
+function resolveDetail(map: DetailMap | undefined, articleNumber: string): ArticleDetailResult | null {
+  if (!map) return null;
+  const v = map.get(articleNumber);
+  return (v && v !== 'loading' && v !== 'error') ? v : null;
+}
+
 // 워크북에 매물 시트 1개 추가 (단일 내보내기 / 슬롯별 시트 분리 공용)
 function addPropertiesWorksheet(
   workbook: ExcelJS.Workbook,
@@ -58,12 +67,14 @@ function addPropertiesWorksheet(
   priceUnit: PriceUnit,
   areaUnit: AreaUnit,
   realEstateType: string,
+  detailMap?: DetailMap,
 ): void {
   const worksheet = workbook.addWorksheet(sheetName);
 
   const unitLabel      = priceUnit === 'thousand' ? '천원' : '만원';
-  // 오피스텔/사무실 등은 두번째 면적을 계약면적으로, 그 외는 공급면적으로 표기
   const useContract    = isExclusiveSpaceType(realEstateType);
+  const isPresale      = isPresaleType(realEstateType);
+  const presaleUseExcl = realEstateType === 'OBYG';
   const u              = areaUnit === 'pyeong' ? '평' : '㎡';
   const toUnit         = (sqm: number) => (areaUnit === 'pyeong' ? round2(sqm * SQM_TO_PYEONG) : sqm);
   const secondSqm      = (p: Property) =>
@@ -75,32 +86,50 @@ function addPropertiesWorksheet(
   type ColSpec = { header: string; key: string; width: number };
 
   const cols: ColSpec[] = [
-    { header: '중지역', key: 'midName',        width: 14 },
-    { header: '소지역', key: 'smallName',      width: 14 },
-    { header: '단지명', key: 'complexName',    width: 40 },
-    { header: '동',     key: 'dongName',       width: 10 },
-    { header: '층',     key: 'floorInfo',      width: 10 },
-    { header: '방향',   key: 'direction',      width: 10 },
-    { header: '타입',   key: 'supplySpaceName', width: 10 },
+    { header: '중지역', key: 'midName',         width: 14 },
+    { header: '소지역', key: 'smallName',        width: 14 },
+    { header: '거래',   key: 'tradeType',        width: 8  },
+    { header: '단지명', key: 'complexName',      width: 40 },
+    { header: '동',     key: 'dongName',         width: 10 },
+    { header: '층',     key: 'floorInfo',        width: 10 },
+    { header: '방향',   key: 'direction',        width: 10 },
+    { header: '타입',   key: 'supplySpaceName',  width: 10 },
   ];
 
-  // 면적 컬럼: 선택 단위만 노출. 전용 + (계약|공급)
-  cols.push({ header: `전용(${u})`, key: 'exclusiveArea', width: 12 });
-  cols.push({ header: `${useContract ? '계약' : '공급'}(${u})`, key: 'secondArea', width: 12 });
+  cols.push({ header: `전용(${u})`,                     key: 'exclusiveArea', width: 12 });
+  cols.push({ header: `${useContract ? '계약' : '공급'}(${u})`, key: 'secondArea',   width: 12 });
 
-  if (hasA1) cols.push({ header: `매매가(${unitLabel})`, key: 'dealPrice',     width: 15 });
-  if (hasA1) cols.push({ header: `평당가(${unitLabel})`, key: 'pyeongPrice',   width: 15 });
+  if (!isPresale && hasA1) {
+    cols.push({ header: `매매가(${unitLabel})`, key: 'dealPrice',   width: 15 });
+    cols.push({ header: `평당가(${unitLabel})`, key: 'pyeongPrice', width: 15 });
+  }
+  if (isPresale) {
+    cols.push({ header: `분양가(${unitLabel})`,         key: 'isalePrice',      width: 15 });
+    cols.push({ header: `평당가(분양)(${unitLabel})`,   key: 'isalePyeong',     width: 16 });
+    cols.push({ header: `P(${unitLabel})`,              key: 'premiumPrice',    width: 12 });
+    cols.push({ header: `옵션비용(${unitLabel})`,       key: 'optionPrice',     width: 15 });
+    cols.push({ header: `매매가(${unitLabel})`,         key: 'totalBuyPrice',   width: 15 });
+    cols.push({ header: `평당가(분양권)(${unitLabel})`, key: 'realPyeongPrice', width: 16 });
+  }
   if (hasB)  cols.push({ header: `보증금(${unitLabel})`, key: 'warrantyPrice', width: 15 });
   if (hasB2) cols.push({ header: `월세(${unitLabel})`,   key: 'rentPrice',     width: 15 });
 
   cols.push(
-    { header: '특징',    key: 'articleFeature', width: 70 },
-    { header: '중개업소', key: 'brokerageName',  width: 30 },
+    { header: '특징',    key: 'articleFeature',     width: 70 },
+    { header: '상세특징', key: 'detailDescription',  width: 30 },
+    { header: '중개업소', key: 'brokerageName',      width: 30 },
+    { header: '업소명',   key: 'realtorName',        width: 10 },
+    { header: '주소',     key: 'realtorAddress',     width: 10 },
+    { header: '연락처1',  key: 'cellPhoneNo',        width: 10 },
+    { header: '연락처2',  key: 'representativeTelNo', width: 10 },
+    { header: '매매매물', key: 'realtorDealCount',   width: 10 },
+    { header: '전세매물', key: 'realtorLeaseCount',  width: 10 },
+    { header: '월세매물', key: 'realtorRentCount',   width: 10 },
   );
 
   worksheet.columns = cols;
 
-  // 헤더 스타일
+  // 헤더 스타일: 전체 중앙정렬
   const headerRow = worksheet.getRow(1);
   headerRow.eachCell((cell) => {
     cell.font      = { bold: true };
@@ -112,32 +141,55 @@ function addPropertiesWorksheet(
   const lastColLetter = worksheet.getColumn(cols.length).letter;
   worksheet.autoFilter = { from: 'A1', to: `${lastColLetter}1` };
 
-  const LEFT_KEYS = new Set(['articleFeature', 'brokerageName']);
-  const NUM_KEYS  = new Set(['dealPrice', 'pyeongPrice', 'warrantyPrice', 'rentPrice']);
+  const LEFT_KEYS = new Set(['articleFeature', 'detailDescription', 'brokerageName', 'realtorName', 'realtorAddress', 'cellPhoneNo', 'representativeTelNo']);
+  const NUM_KEYS  = new Set(['dealPrice', 'pyeongPrice', 'warrantyPrice', 'rentPrice', 'isalePrice', 'isalePyeong', 'premiumPrice', 'optionPrice', 'totalBuyPrice', 'realPyeongPrice']);
   const AREA_KEYS = new Set(['exclusiveArea', 'secondArea']);
 
   for (const p of properties) {
-    const secondVal = secondSqm(p);
+    const secondVal     = secondSqm(p);
+    const presaleArea   = presaleUseExcl ? p.exclusiveSpace : p.supplySpace;
+    const presalePyeong = presaleArea * SQM_TO_PYEONG;
+    const totalBuy      = p.isalePrice + p.premiumPrice + p.optionPrice;
+    const realPyeongPr  = presalePyeong > 0 && totalBuy > 0 ? totalBuy / presalePyeong : 0;
+    const detail        = resolveDetail(detailMap, p.articleNumber);
 
     const rowData: Record<string, string | number | null> = {
-      midName:         p.midName         || '-',
-      smallName:       p.smallName       || '-',
-      complexName:     p.complexName     || '-',
-      dongName:        p.dongName        || '-',
-      floorInfo:       p.floorInfo       || '-',
-      direction:       formatDirection(p.direction) || '-',
-      supplySpaceName: p.supplySpaceName || '-',
-      exclusiveArea:   p.exclusiveSpace > 0 ? toUnit(p.exclusiveSpace) : null,
-      secondArea:      secondVal > 0 ? toUnit(secondVal) : null,
-      articleFeature:  p.articleFeature  || '-',
-      brokerageName:   cleanBrokerageName(p.brokerageName) || '-',
+      midName:             p.midName         || '-',
+      smallName:           p.smallName       || '-',
+      tradeType:           TRADE_TYPE_LABELS[p.tradeType] ?? p.tradeType,
+      complexName:         p.complexName     || '-',
+      dongName:            p.dongName        || '-',
+      floorInfo:           p.floorInfo       || '-',
+      direction:           formatDirection(p.direction) || '-',
+      supplySpaceName:     p.supplySpaceName || '-',
+      exclusiveArea:       p.exclusiveSpace > 0 ? toUnit(p.exclusiveSpace) : null,
+      secondArea:          secondVal > 0 ? toUnit(secondVal) : null,
+      articleFeature:      p.articleFeature  || '-',
+      detailDescription:   detail?.detailDescription || null,
+      brokerageName:       cleanBrokerageName(p.brokerageName) || '-',
+      realtorName:         detail?.realtorName        || null,
+      realtorAddress:      detail?.realtorAddress     || null,
+      cellPhoneNo:         detail?.cellPhoneNo        || null,
+      representativeTelNo: detail?.representativeTelNo || null,
+      realtorDealCount:    detail != null ? detail.dealCount  : null,
+      realtorLeaseCount:   detail != null ? detail.leaseCount : null,
+      realtorRentCount:    detail != null ? detail.rentCount  : null,
     };
 
-    if (hasA1) {
+    if (!isPresale && hasA1) {
       rowData.dealPrice = p.tradeType === 'A1' && p.dealPrice > 0
         ? toPriceUnit(p.dealPrice, priceUnit) : null;
       const pyeongWon = pyeongUnitPriceWon(p, realEstateType);
       rowData.pyeongPrice = pyeongWon > 0 ? toPriceUnit(pyeongWon, priceUnit) : null;
+    }
+    if (isPresale) {
+      rowData.isalePrice     = p.isalePrice > 0   ? toPriceUnit(p.isalePrice, priceUnit)   : null;
+      rowData.isalePyeong    = presalePyeong > 0 && p.isalePrice > 0
+        ? toPriceUnit(p.isalePrice / presalePyeong, priceUnit) : null;
+      rowData.premiumPrice   = p.premiumPrice > 0 ? toPriceUnit(p.premiumPrice, priceUnit)  : null;
+      rowData.optionPrice    = p.optionPrice > 0  ? toPriceUnit(p.optionPrice, priceUnit)   : null;
+      rowData.totalBuyPrice  = totalBuy > 0       ? toPriceUnit(totalBuy, priceUnit)        : null;
+      rowData.realPyeongPrice = realPyeongPr > 0  ? toPriceUnit(realPyeongPr, priceUnit)   : null;
     }
     if (hasB) {
       rowData.warrantyPrice = (p.tradeType === 'B1' || p.tradeType === 'B2') && p.warrantyPrice > 0
@@ -156,7 +208,8 @@ function addPropertiesWorksheet(
 
       cell.alignment = {
         horizontal: LEFT_KEYS.has(key) ? 'left' : 'center',
-        vertical: 'middle',
+        vertical:   'middle',
+        wrapText:   key === 'detailDescription' ? true : undefined,
       };
 
       if (NUM_KEYS.has(key) && typeof cell.value === 'number') {
@@ -216,10 +269,11 @@ export async function exportExcel(
   areaUnit: AreaUnit = 'sqm',
   realEstateType = '',
   filenameBase?: string,
+  detailMap?: DetailMap,
 ): Promise<void> {
   if (properties.length === 0) return;
   const workbook = new ExcelJS.Workbook();
-  addPropertiesWorksheet(workbook, '매물', properties, priceUnit, areaUnit, realEstateType);
+  addPropertiesWorksheet(workbook, '매물', properties, priceUnit, areaUnit, realEstateType, detailMap);
   const name = filenameBase ? `${filenameBase}.xlsx` : `naver_properties_${new Date().toISOString().slice(0, 10)}.xlsx`;
   await downloadWorkbook(workbook, name);
 }
