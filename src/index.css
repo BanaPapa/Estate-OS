@@ -2414,6 +2414,23 @@ thead .col-resize-handle:active {
   margin: 0;
 }
 
+/* ── 내보내기 진행(데이터 포장 중) 모달 ── */
+.export-progress-modal {
+  width: 360px;
+  max-width: 90vw;
+  padding: 36px 28px 30px;
+}
+.export-progress-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--fg);
+  margin-top: 4px;
+}
+.export-progress-bar {
+  width: 100%;
+  margin-top: 18px;
+}
+
 /* ── 중개업소 정보 테이블 ── */
 .realtor-info-table {
   width: 100%;

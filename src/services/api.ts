@@ -86,8 +86,8 @@ function addPropertiesWorksheet(
   type ColSpec = { header: string; key: string; width: number };
 
   const cols: ColSpec[] = [
-    { header: '중지역', key: 'midName',         width: 14 },
-    { header: '소지역', key: 'smallName',        width: 14 },
+    { header: '중지역', key: 'midName',         width: 10 },
+    { header: '소지역', key: 'smallName',        width: 10 },
     { header: '거래',   key: 'tradeType',        width: 8  },
     { header: '단지명', key: 'complexName',      width: 40 },
     { header: '동',     key: 'dongName',         width: 10 },
@@ -96,33 +96,33 @@ function addPropertiesWorksheet(
     { header: '타입',   key: 'supplySpaceName',  width: 10 },
   ];
 
-  cols.push({ header: `전용(${u})`,                     key: 'exclusiveArea', width: 12 });
-  cols.push({ header: `${useContract ? '계약' : '공급'}(${u})`, key: 'secondArea',   width: 12 });
+  cols.push({ header: `전용(${u})`,                     key: 'exclusiveArea', width: 10 });
+  cols.push({ header: `${useContract ? '계약' : '공급'}(${u})`, key: 'secondArea',   width: 10 });
 
   if (!isPresale && hasA1) {
-    cols.push({ header: `매매가(${unitLabel})`, key: 'dealPrice',   width: 15 });
-    cols.push({ header: `평당가(${unitLabel})`, key: 'pyeongPrice', width: 15 });
+    cols.push({ header: `매매가(${unitLabel})`, key: 'dealPrice',   width: 10 });
+    cols.push({ header: `평당가(${unitLabel})`, key: 'pyeongPrice', width: 10 });
   }
   if (isPresale) {
-    cols.push({ header: `분양가(${unitLabel})`,         key: 'isalePrice',      width: 15 });
-    cols.push({ header: `평당가(분양)(${unitLabel})`,   key: 'isalePyeong',     width: 16 });
-    cols.push({ header: `P(${unitLabel})`,              key: 'premiumPrice',    width: 12 });
-    cols.push({ header: `옵션비용(${unitLabel})`,       key: 'optionPrice',     width: 15 });
-    cols.push({ header: `매매가(${unitLabel})`,         key: 'totalBuyPrice',   width: 15 });
-    cols.push({ header: `평당가(분양권)(${unitLabel})`, key: 'realPyeongPrice', width: 16 });
+    cols.push({ header: `분양가(${unitLabel})`,         key: 'isalePrice',      width: 10 });
+    cols.push({ header: `평당가(분양)(${unitLabel})`,   key: 'isalePyeong',     width: 10 });
+    cols.push({ header: `P(${unitLabel})`,              key: 'premiumPrice',    width: 10 });
+    cols.push({ header: `옵션비용(${unitLabel})`,       key: 'optionPrice',     width: 10 });
+    cols.push({ header: `매매가(${unitLabel})`,         key: 'totalBuyPrice',   width: 10 });
+    cols.push({ header: `평당가(분양권)(${unitLabel})`, key: 'realPyeongPrice', width: 10 });
   }
-  if (hasB)  cols.push({ header: `보증금(${unitLabel})`, key: 'warrantyPrice', width: 15 });
-  if (hasB2) cols.push({ header: `월세(${unitLabel})`,   key: 'rentPrice',     width: 15 });
+  if (hasB)  cols.push({ header: `보증금(${unitLabel})`, key: 'warrantyPrice', width: 10 });
+  if (hasB2) cols.push({ header: `월세(${unitLabel})`,   key: 'rentPrice',     width: 10 });
 
   cols.push({ header: '특징', key: 'articleFeature', width: 70 });
   if (detailMap) cols.push({ header: '상세특징', key: 'detailDescription', width: 30 });
   cols.push({ header: '중개업소', key: 'brokerageName', width: 30 });
   if (detailMap) {
+    // 업소명은 중개업소와 동일한 내용이므로 제외
     cols.push(
-      { header: '업소명',   key: 'realtorName',        width: 10 },
-      { header: '주소',     key: 'realtorAddress',     width: 10 },
-      { header: '연락처1',  key: 'cellPhoneNo',        width: 10 },
-      { header: '연락처2',  key: 'representativeTelNo', width: 10 },
+      { header: '주소',     key: 'realtorAddress',     width: 30 },
+      { header: '연락처1',  key: 'cellPhoneNo',        width: 15 },
+      { header: '연락처2',  key: 'representativeTelNo', width: 15 },
       { header: '매매매물', key: 'realtorDealCount',   width: 10 },
       { header: '전세매물', key: 'realtorLeaseCount',  width: 10 },
       { header: '월세매물', key: 'realtorRentCount',   width: 10 },
@@ -143,7 +143,7 @@ function addPropertiesWorksheet(
   const lastColLetter = worksheet.getColumn(cols.length).letter;
   worksheet.autoFilter = { from: 'A1', to: `${lastColLetter}1` };
 
-  const LEFT_KEYS = new Set(['articleFeature', 'detailDescription', 'brokerageName', 'realtorName', 'realtorAddress', 'cellPhoneNo', 'representativeTelNo']);
+  const LEFT_KEYS = new Set(['articleFeature', 'detailDescription', 'brokerageName', 'realtorAddress']);
   const NUM_KEYS  = new Set(['dealPrice', 'pyeongPrice', 'warrantyPrice', 'rentPrice', 'isalePrice', 'isalePyeong', 'premiumPrice', 'optionPrice', 'totalBuyPrice', 'realPyeongPrice']);
   const AREA_KEYS = new Set(['exclusiveArea', 'secondArea']);
 
@@ -169,7 +169,6 @@ function addPropertiesWorksheet(
       articleFeature:      p.articleFeature  || '-',
       detailDescription:   detail?.detailDescription || null,
       brokerageName:       cleanBrokerageName(p.brokerageName) || '-',
-      realtorName:         detail?.realtorName        || null,
       realtorAddress:      detail?.realtorAddress     || null,
       cellPhoneNo:         detail?.cellPhoneNo        || null,
       representativeTelNo: detail?.representativeTelNo || null,
@@ -203,6 +202,7 @@ function addPropertiesWorksheet(
     }
 
     const row = worksheet.addRow(rowData);
+    row.height = 16.5; // 내용 길이와 무관하게 행 높이 고정
 
     for (let i = 1; i <= cols.length; i++) {
       const key  = cols[i - 1].key;
@@ -211,7 +211,6 @@ function addPropertiesWorksheet(
       cell.alignment = {
         horizontal: LEFT_KEYS.has(key) ? 'left' : 'center',
         vertical:   'middle',
-        wrapText:   key === 'detailDescription' ? true : undefined,
       };
 
       if (NUM_KEYS.has(key) && typeof cell.value === 'number') {

@@ -786,34 +786,21 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
           <input className="search-input" type="text" placeholder="단지명/특징 검색..."
             value={filterText} onChange={(e) => { setFilterText(e.target.value); setPage(0); }} />
 
-          {exportFetchProgress ? (
-            <>
-              <span className="dup-count-hint">
-                상세정보 수집 중… ({exportFetchProgress.current.toLocaleString()}/{exportFetchProgress.total.toLocaleString()})
-              </span>
-              <button className="btn-outline btn-sm" onClick={() => { exportCancelRef.current = true; }}>
-                취소
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="btn-outline btn-sm"
-                onClick={() => setExportConfirm('excel')}
-                disabled={allFiltered.length === 0}>
-                Excel 내보내기
-              </button>
-              <button className="btn-outline btn-sm"
-                onClick={() => setExportConfirm('json')}
-                disabled={allFiltered.length === 0}>
-                JSON 내보내기
-              </button>
-              <button className="btn-outline btn-sm"
-                onClick={() => setExportConfirm('md')}
-                disabled={allFiltered.length === 0}>
-                MD 내보내기
-              </button>
-            </>
-          )}
+          <button className="btn-outline btn-sm"
+            onClick={() => setExportConfirm('excel')}
+            disabled={allFiltered.length === 0}>
+            Excel 내보내기
+          </button>
+          <button className="btn-outline btn-sm"
+            onClick={() => setExportConfirm('json')}
+            disabled={allFiltered.length === 0}>
+            JSON 내보내기
+          </button>
+          <button className="btn-outline btn-sm"
+            onClick={() => setExportConfirm('md')}
+            disabled={allFiltered.length === 0}>
+            MD 내보내기
+          </button>
         </div>
       </div>
 
@@ -1177,6 +1164,31 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
                   상세정보 포함
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 내보내기 상세정보 보강 수집 진행 모달 — 100% 완료 시 자동으로 닫히고 다운로드가 시작됨 */}
+      {exportFetchProgress && (
+        <div className="modal-overlay">
+          <div className="modal-card export-progress-modal">
+            <div className="cm-live">
+              <div className="cm-live-spin" />
+              <div className="export-progress-title">데이터 포장 중…</div>
+              <div className="cp-bar export-progress-bar">
+                <i style={{ width: `${Math.round((exportFetchProgress.current / exportFetchProgress.total) * 100)}%` }} />
+              </div>
+              <div className="cm-live-frac">
+                {Math.round((exportFetchProgress.current / exportFetchProgress.total) * 100)}%
+                {' · '}{exportFetchProgress.current.toLocaleString()} / {exportFetchProgress.total.toLocaleString()}건
+              </div>
+              <button className="eos-run-btn stop cm-stop-btn" onClick={() => { exportCancelRef.current = true; }}>
+                <svg viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                </svg>
+                내보내기 중지
+              </button>
             </div>
           </div>
         </div>
