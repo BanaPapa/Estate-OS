@@ -32,7 +32,11 @@ export function useAuth() {
       setState((s) => ({ ...s, profile: null, profileLoading: false }));
       return;
     }
-    setState((s) => ({ ...s, profileLoading: true }));
+    // blocking 로딩 화면은 '최초 1회'(프로필 미조회)에만 표시.
+    // 탭 포커스 시 Supabase 토큰 자동 갱신 → onAuthStateChange → 여기 재진입 시
+    // profileLoading을 true로 올리면 App이 로딩 화면으로 전환되어 작업 화면(검색조건·결과·캐시)이
+    // 통째로 언마운트/초기화된다. 이미 프로필이 있으면 백그라운드로 조용히 갱신한다.
+    setState((s) => ({ ...s, profileLoading: s.profile === null }));
     try {
       const profile = await fetchMyProfile();
       if (userIdRef.current !== uid) return; // 그 사이 사용자 변경됨 → 폐기
@@ -40,7 +44,9 @@ export function useAuth() {
     } catch (err) {
       console.error('프로필 조회 실패:', err);
       if (userIdRef.current !== uid) return;
-      setState((s) => ({ ...s, profile: null, profileLoading: false }));
+      // 백그라운드 갱신 실패 시 기존 프로필 유지 (일시적 네트워크 오류로 화면이 초기화되지 않도록).
+      // 최초 조회 실패 시에만 null 유지 → 승인 대기 화면으로.
+      setState((s) => ({ ...s, profileLoading: false }));
     }
   }, []);
 

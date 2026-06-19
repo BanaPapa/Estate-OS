@@ -598,24 +598,29 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
     onStatsChange?.(tableStats);
   }, [tableStats, onStatsChange]);
 
-  // 분양권 가격(분양가·프리미엄·옵션)은 fin.land 목록 API에 없고 new.land 상세 API에만 존재.
-  // 수집 완료 후 결과 전체를 1회 순차 prefetch → detailCache에 보관.
-  // 캐시는 searchKey 변경 시에만 초기화되므로 정렬·필터·페이지·브라우저 탭 전환에도 재요청 없음.
-  // 현재 보이는 페이지를 앞쪽에 배치해 화면의 행부터 우선 채운다.
+  // 분양권 가격 fallback prefetch.
+  // 신규 수집은 크롤러가 완료 전에 가격을 properties에 채우므로 보통 여기서 할 일이 없다.
+  // 단, 가격이 비어있는 매물(예: 가격 보강 이전에 저장된 슬롯 데이터)만 상세 API로 보강한다.
+  // 캐시는 searchKey 변경 시에만 초기화 → 정렬·필터·페이지·브라우저 탭 전환에 재요청 없음.
   useEffect(() => {
     if (!isPresale) return;
     if (status !== 'done' && status !== 'stopped') return;
     if (properties.length === 0) return;
 
-    let cancelled = false;
     const pageKeys = new Set(paginated.map((p) => p.articleNumber));
     const ordered = [
       ...properties.filter((p) => pageKeys.has(p.articleNumber)),
       ...properties.filter((p) => !pageKeys.has(p.articleNumber)),
     ];
+    // 이미 가격이 있는 매물은 제외 (크롤러가 채운 경우)
+    const pending = ordered.filter(
+      (p) => p.isalePrice <= 0 && p.premiumPrice === 0 && p.optionPrice === 0,
+    );
+    if (pending.length === 0) return;
 
+    let cancelled = false;
     (async () => {
-      for (const p of ordered) {
+      for (const p of pending) {
         if (cancelled) return;
         const cur = detailCacheRef.current.get(p.articleNumber);
         if (cur && cur !== 'error') continue; // 이미 성공 캐시됨 → 스킵
@@ -625,7 +630,6 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
     })();
 
     return () => { cancelled = true; };
-    // paginated는 정렬·필터 시 바뀌지만, 캐시 가드 덕분에 이미 받은 항목은 재요청하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPresale, status, searchKey, properties.length]);
 

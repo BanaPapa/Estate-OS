@@ -94,6 +94,14 @@ export function useCrawler() {
           properties: [...prev.properties, property],
         }));
       },
+      onPropertyPatch: (articleNumber: string, patch: Partial<Property>) => {
+        setState((prev) => ({
+          ...prev,
+          properties: prev.properties.map((p) =>
+            p.articleNumber === articleNumber ? { ...p, ...patch } : p,
+          ),
+        }));
+      },
       onDongs: (dongs: DongProgress[]) => {
         setState((prev) => ({ ...prev, dongs }));
       },

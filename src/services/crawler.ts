@@ -1,8 +1,8 @@
-import { searchComplexes, getArticleList, getComplexesByCortarNo, getArticlesByCortar, ComplexItem } from './naverApi';
+import { searchComplexes, getArticleList, getComplexesByCortarNo, getArticlesByCortar, getArticleDetail, ComplexItem } from './naverApi';
 import { normalizeArticleInfo, normalizeNewLandArticle } from './normalizer';
 import { getRegions } from './kbland';
 import { randomDelay } from './utils';
-import { Property, NAVER_TYPE_MAP, isExclusiveSpaceType, LogEntry, ProgressInfo, DoneSummary, DongProgress } from '../types';
+import { Property, NAVER_TYPE_MAP, isExclusiveSpaceType, isPresaleType, LogEntry, ProgressInfo, DoneSummary, DongProgress } from '../types';
 
 export type { LogEntry, ProgressInfo, DoneSummary, DongProgress };
 
@@ -49,6 +49,8 @@ export interface CrawlerOptions {
   onLog: (msg: LogEntry) => void;
   onProgress: (progress: ProgressInfo) => void;
   onProperty: (property: Property) => void;
+  // 분양권 상세 가격(분양가·프리미엄·옵션) 채워진 뒤 해당 매물을 부분 갱신
+  onPropertyPatch: (articleNumber: string, patch: Partial<Property>) => void;
   onDongs: (dongs: DongProgress[]) => void;
   onDone: (summary: DoneSummary) => void;
   onError: (err: string) => void;
@@ -71,6 +73,8 @@ interface RunContext {
   spaceFilteredOut: number;
   totalComplexes: number;
   dongStates: DongProgress[]; // 사이드바 진행률 시각화용
+  // 분양권 가격 보강 대상 (수집 완료 후 상세 API로 분양가/프리미엄/옵션 채움)
+  presaleRefs: { articleNumber: string; complexNumber: number }[];
 }
 
 function log(onLog: (msg: LogEntry) => void, level: LogEntry['level'], message: string) {
@@ -145,6 +149,13 @@ export class CrawlerService {
     if (ctx.passSpace(tagged)) {
       this.opts.onProperty(tagged);
       ctx.totalProperties++;
+      // 분양권은 목록 API에 가격이 없음 → 수집 완료 후 상세 API로 보강할 대상에 등록
+      if (isPresaleType(tagged.realEstateType) && tagged.articleNumber) {
+        ctx.presaleRefs.push({
+          articleNumber: tagged.articleNumber,
+          complexNumber: tagged.complexNumber,
+        });
+      }
     } else {
       ctx.spaceFilteredOut++;
     }
@@ -230,6 +241,7 @@ export class CrawlerService {
       spaceFilteredOut: 0,
       totalComplexes: 0,
       dongStates: [],
+      presaleRefs: [],
     };
     this._ctx = ctx;
 
@@ -285,7 +297,56 @@ export class CrawlerService {
       }
     }
 
+    // 분양권 가격 보강 — '완료' 처리 전에 끝내 결과창에 가격이 모두 채워진 상태로 완료되게 함
+    await this.enrichPresalePrices(ctx);
+
     this.finish(ctx, startTime, this._stopRequested);
+  }
+
+  // 분양권(ABYG/OBYG)은 목록 API에 분양가/프리미엄/옵션이 없으므로
+  // 수집 완료 직후 new.land 상세 API로 매물별 가격을 채운다. (차단 회피용 순차 + 딜레이)
+  private async enrichPresalePrices(ctx: RunContext): Promise<void> {
+    const refs = ctx.presaleRefs;
+    if (refs.length === 0 || this._stopRequested) return;
+
+    const total = refs.length;
+    log(this.opts.onLog, 'info', `💰 분양권 가격 정보 수집 중… (0/${total})`);
+
+    for (let i = 0; i < total; i++) {
+      if (this._stopRequested) return;
+      const { articleNumber, complexNumber } = refs[i];
+      try {
+        const detail = await getArticleDetail(
+          articleNumber,
+          complexNumber > 0 ? complexNumber : undefined,
+        );
+        if (detail) {
+          this.opts.onPropertyPatch(articleNumber, {
+            isalePrice: detail.isalePrice,
+            premiumPrice: detail.premiumPrice,
+            optionPrice: detail.optionPrice,
+          });
+        }
+      } catch {
+        // 개별 매물 실패는 무시 (가격은 '-'로 표시됨)
+      }
+
+      // 진행 상황 갱신 (10건마다 + 마지막)
+      if ((i + 1) % 10 === 0 || i + 1 === total) {
+        log(this.opts.onLog, 'info', `💰 분양권 가격 정보 수집 중… (${i + 1}/${total})`);
+        this.opts.onProgress({
+          phase: 'crawl',
+          current: i + 1,
+          total,
+          complexName: '가격 정보 수집',
+          propertyCount: ctx.totalProperties,
+        });
+      }
+
+      if (i < total - 1) await randomDelay(150, 400);
+    }
+
+    log(this.opts.onLog, 'success', `💰 분양권 가격 정보 수집 완료 (${total}건)`);
   }
 
   private finish(ctx: RunContext, startTime: number, stopped: boolean): void {
