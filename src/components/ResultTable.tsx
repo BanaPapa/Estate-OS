@@ -232,20 +232,6 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
   // Sync colWidths when userId changes (login/logout)
   useEffect(() => { setColWidths(loadColWidths(userId)); }, [userId]);
 
-  // 분양권 페이지 자동 detail 패치 (프리미엄/옵션비용은 fin.land 목록 API에 없음)
-  useEffect(() => {
-    if (!isPresale) return;
-    const toFetch = paginated.filter((p) => !detailCacheRef.current.has(p.articleNumber));
-    if (toFetch.length === 0) return;
-    const timers = toFetch.map((p, i) =>
-      setTimeout(() => {
-        if (!detailCacheRef.current.has(p.articleNumber)) ensureDetail(p);
-      }, i * 450),
-    );
-    return () => timers.forEach(clearTimeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginated, isPresale]);
-
   const priceUnitLabel = priceUnit === 'thousand' ? '천원' : '만원';
 
   // ── Detail cache (lazy fetch) ──
@@ -430,6 +416,21 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
     properties, complexFilter, tradeTypeFilter, spaceMin, spaceMax, areaUnit,
     filterText, sortKey, sortDir, page, realEstateType, isDupHidden, expandedGroups,
   ]);
+
+  // 분양권 페이지 자동 detail 패치 (프리미엄/옵션비용은 fin.land 목록 API에 없음)
+  // ※ paginated 선언 이후에 위치해야 deps 배열 참조가 TDZ 오류를 일으키지 않음
+  useEffect(() => {
+    if (!isPresale) return;
+    const toFetch = paginated.filter((p) => !detailCacheRef.current.has(p.articleNumber));
+    if (toFetch.length === 0) return;
+    const timers = toFetch.map((p, i) =>
+      setTimeout(() => {
+        if (!detailCacheRef.current.has(p.articleNumber)) ensureDetail(p);
+      }, i * 450),
+    );
+    return () => timers.forEach(clearTimeout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginated, isPresale]);
 
   const hasActiveFilter = !!(complexFilter || tradeTypeFilter || filterText || spaceMin > 0 || spaceMax > 0);
   const areaCols = useMemo(() => buildAreaCols(areaUnit, useContract), [areaUnit, useContract]);
