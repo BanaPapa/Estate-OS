@@ -65,6 +65,15 @@ export function NaverCrawlerTab({ crawler, slots, session, agentStatus }: NaverC
     }
   }, [loginJustSucceeded]);
 
+  // agentRunStatus가 일시적으로 offline/unknown으로 바뀌어도 15초 간 이전 상태 유지
+  // (탭 전환 후 복귀 시 polling 간격에 의한 순간 상태 변화로 SearchPanel 언마운트 방지)
+  const lastRunningAtRef = useRef<number>(0);
+  if (agentRunStatus === 'running') lastRunningAtRef.current = Date.now();
+  const GRACE_MS = 15_000;
+  const stableRunning =
+    agentRunStatus === 'running' ||
+    Date.now() - lastRunningAtRef.current < GRACE_MS;
+
   // 에이전트 상태 변경 시 베이스 URL + 크롤 토큰 관리
   useEffect(() => {
     const agentRunning = agentRunStatus === 'running';
@@ -156,8 +165,8 @@ export function NaverCrawlerTab({ crawler, slots, session, agentStatus }: NaverC
   // 첫 수집 전(idle)에는 결과 영역(헤더 포함)을 대형 안내로 가린다.
   const showEmptyState = state.status === 'idle';
 
-  // 에이전트 미실행 또는 초기 상태(unknown)일 때 안내 화면 표시
-  if (agentRunStatus === 'offline' || agentRunStatus === 'unknown') {
+  // 에이전트 미실행 또는 초기 상태(unknown)일 때 안내 화면 표시 (grace period 이후에만)
+  if (!stableRunning) {
     return (
       <div className="eos-state-screen">
         <div className="nv-agent-offline">
@@ -331,8 +340,8 @@ export function NaverCrawlerTab({ crawler, slots, session, agentStatus }: NaverC
     );
   }
 
-  // 에이전트 실행 중이지만 네이버 로그인 안 됨
-  if (agentRunStatus === 'running' && !cookieReady) {
+  // 에이전트 실행 중이지만 네이버 로그인 안 됨 (데이터 없을 때만)
+  if (agentRunStatus === 'running' && !cookieReady && state.properties.length === 0) {
     return (
       <div className="eos-state-screen">
         <div className="nv-agent-offline">
@@ -387,7 +396,7 @@ export function NaverCrawlerTab({ crawler, slots, session, agentStatus }: NaverC
   }
 
   // 로그인 직후 성공 안내 (3.5초)
-  if (agentRunStatus === 'running' && cookieReady && showLoginSuccess) {
+  if (agentRunStatus === 'running' && cookieReady && showLoginSuccess && state.properties.length === 0) {
     return (
       <div className="eos-state-screen">
         <div className="nv-agent-offline">

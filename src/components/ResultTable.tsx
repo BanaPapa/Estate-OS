@@ -559,45 +559,6 @@ export function ResultTable({ searchKey, properties, realEstateType, areaUnit, p
     filterText, sortKey, sortDir, page, realEstateType, isDupHidden, expandedGroups,
   ]);
 
-  // 분양권 fetch 대상: 필터만 적용 (sort 제외) → 정렬 변경 시 in-flight 타이머 취소 방지
-  const filteredForFetch = useMemo(() => {
-    let fil = [...properties];
-    if (complexFilter)   fil = fil.filter((p) => p.complexName === complexFilter);
-    if (tradeTypeFilter) fil = fil.filter((p) => p.tradeType   === tradeTypeFilter);
-    if (spaceMin > 0 || spaceMax > 0) {
-      const toSqm = (v: number) => areaUnit === 'pyeong' ? v * PYEONG_TO_SQM : v;
-      const lo = spaceMin > 0 ? toSqm(spaceMin) : 0;
-      const hi = spaceMax > 0 ? toSqm(spaceMax) : Number.POSITIVE_INFINITY;
-      fil = fil.filter((p) => {
-        if (p.supplySpace <= 0 && p.exclusiveSpace <= 0) return true;
-        return (p.supplySpace    > 0 && p.supplySpace    >= lo && p.supplySpace    <= hi) ||
-               (p.exclusiveSpace > 0 && p.exclusiveSpace >= lo && p.exclusiveSpace <= hi);
-      });
-    }
-    if (filterText.trim()) {
-      const q = filterText.trim().toLowerCase();
-      fil = fil.filter((p) =>
-        p.complexName.toLowerCase().includes(q) ||
-        p.dongName.toLowerCase().includes(q)    ||
-        p.articleFeature.toLowerCase().includes(q),
-      );
-    }
-    return fil;
-  }, [properties, complexFilter, tradeTypeFilter, spaceMin, spaceMax, areaUnit, filterText]);
-
-  // 분양권 자동 detail 패치: filteredForFetch 기준 → 정렬 변경 시 타이머 재시작 없음
-  useEffect(() => {
-    if (!isPresale) return;
-    const toFetch = filteredForFetch.filter((p) => !detailCacheRef.current.has(p.articleNumber));
-    if (toFetch.length === 0) return;
-    const timers = toFetch.map((p, i) =>
-      setTimeout(() => {
-        if (!detailCacheRef.current.has(p.articleNumber)) ensureDetail(p);
-      }, i * 450),
-    );
-    return () => timers.forEach(clearTimeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredForFetch, isPresale]);
 
   // ── 평균 통계 (필터+중복숨김 상태 반영) ──
   const tableStats = useMemo<TableStats>(() => {
@@ -959,7 +920,7 @@ export function ResultTable({ searchKey, properties, realEstateType, areaUnit, p
                         <div className="td-price-inner">
                           {totalBuy > 0 ? (
                             <>
-                              <span className="price-value">{formatPriceByUnit(totalBuy, priceUnit)}</span>
+                              <span className="price-value presale-main-price">{formatPriceByUnit(totalBuy, priceUnit)}</span>
                               <button
                                 className="detail-plus-btn"
                                 title="매입비용 계산"
@@ -972,7 +933,9 @@ export function ResultTable({ searchKey, properties, realEstateType, areaUnit, p
                     )}
                     {isPresale && (
                       <td className="td-pyeong presale-col">
-                        {realPyeongPrice > 0 ? formatPriceByUnit(realPyeongPrice, priceUnit) : '-'}
+                        {realPyeongPrice > 0
+                          ? <span className="presale-main-price">{formatPriceByUnit(realPyeongPrice, priceUnit)}</span>
+                          : '-'}
                       </td>
                     )}
 

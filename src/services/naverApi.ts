@@ -572,14 +572,36 @@ export async function getAcquisitionCost(
   complexNo: number,
   dealPriceWon: number,      // 원 단위 — API 호출 시 만원으로 변환
 ): Promise<AcquisitionCostResult | null> {
+  const dealPriceManwon = Math.round(dealPriceWon / 10_000);
+  // fin.land POST 시도
+  try {
+    const data = await naverPost('/complex/article/acquisition-cost', {
+      articleNumber: articleNo,
+      complexNumber: String(complexNo),
+      dealPrice: dealPriceManwon,
+    }) as Record<string, unknown>;
+    const r = (data.result ?? data) as Record<string, unknown>;
+    const toNum = (v: unknown) => Number(v ?? 0);
+    if (toNum(r.acquisitionTax) > 0 || toNum(r.totalPrice) > 0) {
+      return {
+        acquisitionTax: toNum(r.acquisitionTax),
+        eduTax:         toNum(r.eduTax),
+        specialTax:     toNum(r.specialTax),
+        totalPrice:     toNum(r.totalPrice),
+        brokerFee:      toNum(r.brokerFee),
+      };
+    }
+  } catch (e) {
+    console.warn('[AcquisitionCost] fin.land POST 실패, GET 시도:', e);
+  }
+  // fin.land GET 시도 (파라미터명 변형)
   try {
     const data = await naverFetch('/complex/article/acquisition-cost', {
       articleNumber: articleNo,
       complexNumber: complexNo,
-      dealPrice: Math.round(dealPriceWon / 10_000),  // 만원 단위
+      dealPrice: dealPriceManwon,
     }) as Record<string, unknown>;
-    const r = (data.result ?? {}) as Record<string, unknown>;
-    // API가 원 단위로 반환
+    const r = (data.result ?? data) as Record<string, unknown>;
     const toNum = (v: unknown) => Number(v ?? 0);
     return {
       acquisitionTax: toNum(r.acquisitionTax),
@@ -588,7 +610,8 @@ export async function getAcquisitionCost(
       totalPrice:     toNum(r.totalPrice),
       brokerFee:      toNum(r.brokerFee),
     };
-  } catch {
+  } catch (e) {
+    console.error('[AcquisitionCost] 매입비용 조회 실패:', e);
     return null;
   }
 }
