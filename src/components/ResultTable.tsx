@@ -34,7 +34,7 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
   dealPrice: 110, pyeongPrice: 110,
   premiumPrice: 96, optionPrice: 96, totalBuyPrice: 110, realPyeongPrice: 110,
   warrantyPrice: 110, rentPrice: 84,
-  feature: 200, brokerage: 120,
+  feature: 200, brokerage: 200,
 };
 
 function loadColWidths(userId: string | null): Record<string, number> {
@@ -225,6 +225,8 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
   const [modalState, setModalState]         = useState<ModalState | null>(null);
   const [detailCache, setDetailCache]       = useState<Map<string, CachedDetail>>(new Map());
   const [colWidths, setColWidths]           = useState<Record<string, number>>(() => loadColWidths(userId));
+  const [isDupHidden, setIsDupHidden]       = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Sync colWidths when userId changes (login/logout)
   useEffect(() => { setColWidths(loadColWidths(userId)); }, [userId]);
@@ -312,9 +314,18 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
     return [...set].sort((a, b) => a.localeCompare(b, 'ko'));
   }, [properties]);
 
-  const { filtered, paginated, totalPages, safePage } = useMemo(() => {
+  // ── Grouped + sorted rows ──
+  const {
+    filteredReps,
+    childrenByGroup,
+    allFiltered,
+    paginated,
+    totalPages,
+    safePage,
+    dupCount,
+  } = useMemo(() => {
+    // 1. Filter all properties (reps + children)
     let fil = [...properties];
-
     if (complexFilter)    fil = fil.filter((p) => p.complexName === complexFilter);
     if (tradeTypeFilter)  fil = fil.filter((p) => p.tradeType   === tradeTypeFilter);
 
@@ -333,15 +344,32 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
 
     if (filterText.trim()) {
       const q = filterText.trim().toLowerCase();
-      fil = fil.filter(
-        (p) =>
-          p.complexName.toLowerCase().includes(q) ||
-          p.dongName.toLowerCase().includes(q)    ||
-          p.articleFeature.toLowerCase().includes(q),
+      fil = fil.filter((p) =>
+        p.complexName.toLowerCase().includes(q) ||
+        p.dongName.toLowerCase().includes(q)    ||
+        p.articleFeature.toLowerCase().includes(q),
       );
     }
 
-    const sorted = [...fil].sort((a, b) => {
+    // 2. Separate reps and children
+    const reps = fil.filter((p) => !p.isDuplicate);
+    const childrenArr = fil.filter((p) => !!p.isDuplicate);
+
+    // Only keep children whose parent rep also passed the filter
+    const repGroupIds = new Set(reps.map((p) => p.groupId).filter(Boolean) as string[]);
+    const childMap = new Map<string, Property[]>();
+    let dupCnt = 0;
+    for (const child of childrenArr) {
+      if (child.groupId && repGroupIds.has(child.groupId)) {
+        const arr = childMap.get(child.groupId) ?? [];
+        arr.push(child);
+        childMap.set(child.groupId, arr);
+        dupCnt++;
+      }
+    }
+
+    // 3. Sort reps only
+    const sortedReps = [...reps].sort((a, b) => {
       const av = getSortValue(a, sortKey, realEstateType);
       const bv = getSortValue(b, sortKey, realEstateType);
       let cmp: number;
@@ -353,12 +381,40 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
       return sortDir === 'asc' ? cmp : -cmp;
     });
 
-    const total = Math.ceil(sorted.length / PAGE_SIZE);
-    const safe  = Math.min(page, Math.max(0, total - 1));
-    const pag   = sorted.slice(safe * PAGE_SIZE, (safe + 1) * PAGE_SIZE);
+    // 4. All data for export (always fully expanded)
+    const allFil: Property[] = sortedReps.flatMap((rep) => {
+      const children = rep.groupId ? (childMap.get(rep.groupId) ?? []) : [];
+      return [rep, ...children];
+    });
 
-    return { filtered: sorted, paginated: pag, totalPages: total, safePage: safe };
-  }, [properties, complexFilter, tradeTypeFilter, spaceMin, spaceMax, areaUnit, filterText, sortKey, sortDir, page, realEstateType]);
+    // 5. Display rows with expansion state
+    const isGroupExpanded = (gid: string) =>
+      isDupHidden ? expandedGroups.has(gid) : !expandedGroups.has(gid);
+
+    const displayRows: Property[] = sortedReps.flatMap((rep) => {
+      const children = rep.groupId ? (childMap.get(rep.groupId) ?? []) : [];
+      const expanded = rep.groupId ? isGroupExpanded(rep.groupId) : false;
+      return expanded ? [rep, ...children] : [rep];
+    });
+
+    // 6. Paginate
+    const total = Math.ceil(displayRows.length / PAGE_SIZE);
+    const safe  = Math.min(page, Math.max(0, total - 1));
+    const pag   = displayRows.slice(safe * PAGE_SIZE, (safe + 1) * PAGE_SIZE);
+
+    return {
+      filteredReps: sortedReps,
+      childrenByGroup: childMap,
+      allFiltered: allFil,
+      paginated: pag,
+      totalPages: total,
+      safePage: safe,
+      dupCount: dupCnt,
+    };
+  }, [
+    properties, complexFilter, tradeTypeFilter, spaceMin, spaceMax, areaUnit,
+    filterText, sortKey, sortDir, page, realEstateType, isDupHidden, expandedGroups,
+  ]);
 
   const hasActiveFilter = !!(complexFilter || tradeTypeFilter || filterText || spaceMin > 0 || spaceMax > 0);
   const areaCols = useMemo(() => buildAreaCols(areaUnit, useContract), [areaUnit, useContract]);
@@ -402,13 +458,27 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
       <div className="result-toolbar">
         <div className="result-info">
           <span className="result-count">
-            총 <strong>{properties.length.toLocaleString()}</strong>건
+            총 <strong>{(filteredReps.length + dupCount).toLocaleString()}</strong>건
+            {dupCount > 0 && <span className="dup-count-hint"> (대표 {filteredReps.length.toLocaleString()}건, 중복 {dupCount.toLocaleString()}건)</span>}
             {' · '}<strong>{complexNames.length.toLocaleString()}</strong>개 단지
-            {hasActiveFilter && ` → 필터: ${filtered.length.toLocaleString()}건`}
+            {hasActiveFilter && ` → 필터: ${filteredReps.length.toLocaleString()}건`}
           </span>
         </div>
 
         <div className="result-actions">
+          {dupCount > 0 && (
+            <button
+              className="btn-outline btn-sm dup-toggle-btn"
+              onClick={() => {
+                setIsDupHidden((prev) => !prev);
+                setExpandedGroups(new Set());
+                setPage(0);
+              }}
+            >
+              {isDupHidden ? `중복 표시 (${dupCount})` : '중복 숨김'}
+            </button>
+          )}
+
           <select className="form-select" style={{ width: 'auto', minWidth: '140px' }}
             value={complexFilter} onChange={(e) => { setComplexFilter(e.target.value); setPage(0); }}>
             <option value="">전체 단지</option>
@@ -436,13 +506,13 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
             value={filterText} onChange={(e) => { setFilterText(e.target.value); setPage(0); }} />
 
           <button className="btn-outline btn-sm"
-            onClick={() => void exportExcel(filtered, priceUnit, areaUnit, realEstateType, buildExportBaseName(meta, filtered.length))}
-            disabled={filtered.length === 0}>
+            onClick={() => void exportExcel(allFiltered, priceUnit, areaUnit, realEstateType, buildExportBaseName(meta, allFiltered.length))}
+            disabled={allFiltered.length === 0}>
             Excel 내보내기
           </button>
           <button className="btn-outline btn-sm"
-            onClick={() => exportJSON(filtered, buildExportBaseName(meta, filtered.length))}
-            disabled={filtered.length === 0}>
+            onClick={() => exportJSON(allFiltered, buildExportBaseName(meta, allFiltered.length))}
+            disabled={allFiltered.length === 0}>
             JSON 내보내기
           </button>
         </div>
@@ -504,8 +574,22 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
               </tr>
             ) : (
               paginated.map((p, idx) => {
-                const rowKey = p.articleNumber || String(idx);
+                const rowKey = p._uid ? String(p._uid) : (p.articleNumber || String(idx));
                 const isSelected = selectedRow === rowKey;
+                const isDup = !!p.isDuplicate;
+
+                // Badge: actual children count for rep, or legacy realtorCount fallback
+                const actualChildCount = (!isDup && p.groupId)
+                  ? (childrenByGroup.get(p.groupId)?.length ?? 0)
+                  : 0;
+                const badgeCount = actualChildCount > 0
+                  ? actualChildCount
+                  : (!isDup && p.realtorCount > 1 ? p.realtorCount - 1 : 0);
+                const isExpandable = !isDup && !!p.groupId && actualChildCount > 0;
+                const isExpanded = isExpandable && (
+                  isDupHidden ? expandedGroups.has(p.groupId!) : !expandedGroups.has(p.groupId!)
+                );
+
                 const effPremium = getEffPremium(p);
                 const effOption  = getEffOption(p);
                 const totalBuy   = p.dealPrice + effPremium + effOption;
@@ -516,8 +600,20 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
                 return (
                   <tr
                     key={rowKey}
-                    className={isSelected ? 'row-selected' : undefined}
+                    className={[
+                      isSelected ? 'row-selected' : '',
+                      isDup ? 'row-duplicate' : '',
+                    ].filter(Boolean).join(' ') || undefined}
                     onClick={() => setSelectedRow((sel) => sel === rowKey ? null : rowKey)}
+                    onDoubleClick={() => {
+                      if (!isExpandable) return;
+                      setExpandedGroups((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(p.groupId!)) next.delete(p.groupId!);
+                        else next.add(p.groupId!);
+                        return next;
+                      });
+                    }}
                     style={{ cursor: 'pointer' }}
                   >
                     <td className="td-region">{p.midName || '-'}</td>
@@ -528,8 +624,19 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
                       </span>
                     </td>
                     <td className="td-complex">
+                      {isDup && <span className="dup-indent">└</span>}
                       <span className="complex-name">{p.complexName}</span>
-                      {p.realtorCount > 1 && <span className="realtor-badge">+{p.realtorCount - 1}</span>}
+                      {badgeCount > 0 && (
+                        <span
+                          className="realtor-badge"
+                          title={isExpandable ? '더블클릭으로 펼치기/접기' : undefined}
+                        >
+                          +{badgeCount}
+                        </span>
+                      )}
+                      {isExpandable && (
+                        <span className="group-expand-icon">{isExpanded ? '▾' : '▸'}</span>
+                      )}
                     </td>
                     <td>{p.dongName || '-'}</td>
                     <td>{p.floorInfo || '-'}</td>
@@ -617,7 +724,7 @@ export function ResultTable({ properties, realEstateType, areaUnit, priceUnit, m
                     </td>
 
                     {/* 중개업소 + 상세정보 버튼 */}
-                    <td>
+                    <td className="td-brokerage">
                       <div className="td-cell-with-btn">
                         <span className="td-cell-text">{cleanBrokerageName(p.brokerageName) || '-'}</span>
                         <button

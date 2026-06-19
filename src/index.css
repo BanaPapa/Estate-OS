@@ -2187,6 +2187,17 @@ input[type='range'].space-range:disabled {
   background: linear-gradient(180deg, transparent 10%, var(--blue) 40%, var(--blue) 60%, transparent 90%);
   opacity: 0.6;
 }
+/* 헤더에서만 열 구분 힌트 표시 */
+thead .col-resize-handle {
+  background: linear-gradient(180deg, transparent 15%, rgba(255, 255, 255, 0.1) 40%, rgba(255, 255, 255, 0.1) 60%, transparent 85%);
+  width: 3px;
+}
+thead .col-resize-handle:hover,
+thead .col-resize-handle:active {
+  background: linear-gradient(180deg, transparent 10%, var(--blue) 40%, var(--blue) 60%, transparent 90%);
+  opacity: 0.7;
+  width: 3px;
+}
 
 /* ── 셀 내 버튼 레이아웃 ── */
 .td-cell-with-btn {
@@ -2762,12 +2773,23 @@ input[type='range'].space-range:disabled {
   background: var(--teal-dim);
   color: var(--teal);
 }
+/* tbody 전체 기본 가운데 정렬, 예외 열은 개별 override */
+.result-table tbody td {
+  text-align: center;
+}
+.result-table tbody td.td-complex,
+.result-table tbody td.td-feature,
+.result-table tbody td.td-brokerage {
+  text-align: left;
+}
 .td-price {
   white-space: nowrap;
+  text-align: center;
 }
 .td-price-inner {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
 }
 .price-value {
@@ -2800,8 +2822,46 @@ input[type='range'].space-range:disabled {
   color: var(--muted);
   font-size: 14.5px;
 }
+.td-brokerage {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 14.5px;
+}
 .td-empty {
   color: var(--muted-2);
+}
+
+/* ── 중복 매물 행 ── */
+.row-duplicate td {
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--fg-2);
+}
+.row-duplicate .complex-name {
+  color: var(--fg-2);
+  font-weight: 500;
+}
+.dup-indent {
+  color: var(--muted-2);
+  font-size: 13px;
+  flex: none;
+  margin-right: 2px;
+}
+.group-expand-icon {
+  font-size: 12px;
+  color: var(--muted);
+  flex: none;
+  opacity: 0.7;
+}
+.dup-count-hint {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.dup-toggle-btn {
+  border-color: var(--blue);
+  color: var(--blue);
 }
 
 /* Pagination */

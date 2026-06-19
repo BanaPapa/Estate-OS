@@ -510,16 +510,27 @@ export class CrawlerService {
 
           for (const item of artResult.list) {
             const mainInfo = item.representativeArticleInfo;
+            const dupList = item.duplicatedArticleInfo?.articleInfoList ?? [];
             const realtorCount = item.duplicatedArticleInfo?.realtorCount ?? 1;
+            const hasActualDups = dupList.length > 0;
+
             const property = normalizeArticleInfo(
               mainInfo,
               complex.complexNumber,
               realtorCount,
               complex.complexName,
             );
+            if (hasActualDups) property.groupId = mainInfo.articleNumber;
+            property.isDuplicate = false;
             this.emitProperty(ctx, property, target);
-            // 중복매물(같은 매물의 다른 중개사 등록)은 수집하지 않음.
-            // 대표 매물의 realtorCount 배지(+N)로 중개사 수만 표시.
+
+            // 중복 하위 매물 수집 (같은 unit의 다른 중개사 등록)
+            for (const dupInfo of dupList) {
+              const dupProp = normalizeArticleInfo(dupInfo, complex.complexNumber, 1, complex.complexName);
+              dupProp.groupId = mainInfo.articleNumber;
+              dupProp.isDuplicate = true;
+              this.emitProperty(ctx, dupProp, target);
+            }
           }
 
           artHasNext = artResult.hasNextPage;

@@ -73,6 +73,8 @@ export interface Property {
   buildDate: string;
   realtorCount: number;
   verificationType: string;
+  groupId?: string;      // 대표 매물 articleNumber — 중복 그룹 묶음 키
+  isDuplicate?: boolean; // true = 대표 아님(중복 하위 매물)
 }
 
 // =============================================
