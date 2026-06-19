@@ -114,18 +114,20 @@ function addPropertiesWorksheet(
   if (hasB)  cols.push({ header: `보증금(${unitLabel})`, key: 'warrantyPrice', width: 15 });
   if (hasB2) cols.push({ header: `월세(${unitLabel})`,   key: 'rentPrice',     width: 15 });
 
-  cols.push(
-    { header: '특징',    key: 'articleFeature',     width: 70 },
-    { header: '상세특징', key: 'detailDescription',  width: 30 },
-    { header: '중개업소', key: 'brokerageName',      width: 30 },
-    { header: '업소명',   key: 'realtorName',        width: 10 },
-    { header: '주소',     key: 'realtorAddress',     width: 10 },
-    { header: '연락처1',  key: 'cellPhoneNo',        width: 10 },
-    { header: '연락처2',  key: 'representativeTelNo', width: 10 },
-    { header: '매매매물', key: 'realtorDealCount',   width: 10 },
-    { header: '전세매물', key: 'realtorLeaseCount',  width: 10 },
-    { header: '월세매물', key: 'realtorRentCount',   width: 10 },
-  );
+  cols.push({ header: '특징', key: 'articleFeature', width: 70 });
+  if (detailMap) cols.push({ header: '상세특징', key: 'detailDescription', width: 30 });
+  cols.push({ header: '중개업소', key: 'brokerageName', width: 30 });
+  if (detailMap) {
+    cols.push(
+      { header: '업소명',   key: 'realtorName',        width: 10 },
+      { header: '주소',     key: 'realtorAddress',     width: 10 },
+      { header: '연락처1',  key: 'cellPhoneNo',        width: 10 },
+      { header: '연락처2',  key: 'representativeTelNo', width: 10 },
+      { header: '매매매물', key: 'realtorDealCount',   width: 10 },
+      { header: '전세매물', key: 'realtorLeaseCount',  width: 10 },
+      { header: '월세매물', key: 'realtorRentCount',   width: 10 },
+    );
+  }
 
   worksheet.columns = cols;
 
@@ -311,9 +313,25 @@ export async function exportSlotsExcel(
 // =============================================
 // JSON 내보내기
 // =============================================
-export function exportJSON(properties: Property[], filenameBase?: string): void {
+export function exportJSON(properties: Property[], filenameBase?: string, detailMap?: DetailMap): void {
   if (properties.length === 0) return;
-  const json = JSON.stringify(properties, null, 2);
+  const data = detailMap
+    ? properties.map((p) => {
+        const detail = resolveDetail(detailMap, p.articleNumber);
+        return detail ? {
+          ...p,
+          detailDescription:   detail.detailDescription,
+          realtorName:         detail.realtorName,
+          realtorAddress:      detail.realtorAddress,
+          cellPhoneNo:         detail.cellPhoneNo,
+          representativeTelNo: detail.representativeTelNo,
+          realtorDealCount:    detail.dealCount,
+          realtorLeaseCount:   detail.leaseCount,
+          realtorRentCount:    detail.rentCount,
+        } : p;
+      })
+    : properties;
+  const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -329,6 +347,7 @@ export function exportMarkdown(
   areaUnit: AreaUnit = 'sqm',
   realEstateType = '',
   filenameBase?: string,
+  detailMap?: DetailMap,
 ): void {
   if (properties.length === 0) return;
   const useContract = isExclusiveSpaceType(realEstateType);
@@ -347,7 +366,10 @@ export function exportMarkdown(
   if (isPresale) { headers.push(`분양가(${unitLabel})`, `프리미엄(${unitLabel})`, `옵션비용(${unitLabel})`, `매수비용(${unitLabel})`, `실평당가(${unitLabel})`); }
   if (hasB)      headers.push(`보증금(${unitLabel})`);
   if (hasB2)     headers.push(`월세(${unitLabel})`);
-  headers.push('특징', '중개업소');
+  headers.push('특징');
+  if (detailMap) headers.push('상세특징');
+  headers.push('중개업소');
+  if (detailMap) headers.push('업소명', '주소', '연락처1', '연락처2', '매매매물', '전세매물', '월세매물');
 
   const sep = headers.map(() => '---').join(' | ');
   const headerRow = headers.join(' | ');
@@ -387,10 +409,26 @@ export function exportMarkdown(
     }
     if (hasB)  cells.push((p.tradeType === 'B1' || p.tradeType === 'B2') ? formatPriceByUnit(p.warrantyPrice, priceUnit) : '-');
     if (hasB2) cells.push(p.tradeType === 'B2' ? formatPriceByUnit(p.rentPrice, priceUnit) : '-');
-    cells.push(
-      (p.articleFeature || '-').replace(/\|/g, '∣'),
-      (cleanBrokerageName(p.brokerageName) || '-').replace(/\|/g, '∣'),
-    );
+
+    const esc = (s: string) => (s || '-').replace(/\|/g, '∣').replace(/\n/g, ' ');
+    cells.push(esc(p.articleFeature));
+    if (detailMap) {
+      const detail = resolveDetail(detailMap, p.articleNumber);
+      cells.push(esc(detail?.detailDescription ?? ''));
+    }
+    cells.push(esc(cleanBrokerageName(p.brokerageName)));
+    if (detailMap) {
+      const detail = resolveDetail(detailMap, p.articleNumber);
+      cells.push(
+        esc(detail?.realtorName ?? ''),
+        esc(detail?.realtorAddress ?? ''),
+        esc(detail?.cellPhoneNo ?? ''),
+        esc(detail?.representativeTelNo ?? ''),
+        detail ? `${detail.dealCount}` : '-',
+        detail ? `${detail.leaseCount}` : '-',
+        detail ? `${detail.rentCount}` : '-',
+      );
+    }
     return cells.join(' | ');
   });
 

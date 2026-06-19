@@ -9,6 +9,7 @@ import {
   getComplexDetail, ComplexDetailResult,
   getAcquisitionCost, AcquisitionCostResult,
 } from '../services/naverApi';
+import { randomDelay } from '../services/utils';
 
 export interface TableStats {
   avgDealPrice: number;    // 원 단위
@@ -34,6 +35,8 @@ type SortKey =
   | 'supplySpaceName' | 'supplySpace' | 'exclusiveSpace' | 'contractSpace' | 'dealPrice' | 'pyeongPrice'
   | 'isalePrice' | 'isalePyeong' | 'premiumPrice' | 'optionPrice' | 'totalBuyPrice' | 'realPyeongPrice';
 type SortDir = 'asc' | 'desc';
+type ExportFormat = 'excel' | 'json' | 'md';
+const EXPORT_FORMAT_LABEL: Record<ExportFormat, string> = { excel: 'Excel', json: 'JSON', md: '마크다운' };
 
 const PAGE_SIZE     = 50;
 const PYEONG_TO_SQM = 3.30579;
@@ -320,6 +323,9 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
   const [colWidths, setColWidths]           = useState<Record<string, number>>(() => loadColWidths(userId));
   const [isDupHidden, setIsDupHidden]       = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [exportFetchProgress, setExportFetchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [exportConfirm, setExportConfirm]   = useState<ExportFormat | null>(null);
+  const exportCancelRef = useRef(false);
 
   // Sync colWidths when userId changes (login/logout)
   useEffect(() => { setColWidths(loadColWidths(userId)); }, [userId]);
@@ -562,6 +568,48 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
     filterText, sortKey, sortDir, page, realEstateType, isDupHidden, expandedGroups,
   ]);
 
+  // 내보내기: 상세특징/중개업소 정보는 "+" 버튼을 눌러야만 채워지는 지연 캐시이므로,
+  // 사용자가 포함을 선택한 경우에만 캐시에 없는 매물을 상세 API로 보강 수집한다 (차단 회피용 순차 + 딜레이).
+  const performExport = useCallback(async (format: ExportFormat, includeDetail: boolean) => {
+    const rows = allFiltered;
+    if (rows.length === 0) return;
+    const filenameBase = buildExportBaseName(meta, rows.length);
+
+    if (includeDetail) {
+      const missing = rows.filter((p) => {
+        const cur = detailCacheRef.current.get(p.articleNumber);
+        return !cur || cur === 'error';
+      });
+
+      if (missing.length > 0) {
+        exportCancelRef.current = false;
+        setExportFetchProgress({ current: 0, total: missing.length });
+        for (let i = 0; i < missing.length; i++) {
+          if (exportCancelRef.current) break;
+          const p = missing[i];
+          try {
+            const result = await getArticleDetail(p.articleNumber, p.complexNumber > 0 ? p.complexNumber : undefined);
+            detailCacheRef.current.set(p.articleNumber, result ?? 'error');
+          } catch {
+            detailCacheRef.current.set(p.articleNumber, 'error');
+          }
+          setExportFetchProgress({ current: i + 1, total: missing.length });
+          if (i < missing.length - 1 && !exportCancelRef.current) await randomDelay(150, 400);
+        }
+        setDetailCache(new Map(detailCacheRef.current));
+        setExportFetchProgress(null);
+      }
+    }
+
+    const detailArg = includeDetail ? detailCacheRef.current : undefined;
+    if (format === 'excel') {
+      await exportExcel(rows, priceUnit, areaUnit, realEstateType, filenameBase, detailArg);
+    } else if (format === 'json') {
+      exportJSON(rows, filenameBase, detailArg);
+    } else {
+      exportMarkdown(rows, priceUnit, areaUnit, realEstateType, filenameBase, detailArg);
+    }
+  }, [allFiltered, priceUnit, areaUnit, realEstateType, meta]);
 
   // ── 평균 통계 (필터+중복숨김 상태 반영) ──
   const tableStats = useMemo<TableStats>(() => {
@@ -738,21 +786,34 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
           <input className="search-input" type="text" placeholder="단지명/특징 검색..."
             value={filterText} onChange={(e) => { setFilterText(e.target.value); setPage(0); }} />
 
-          <button className="btn-outline btn-sm"
-            onClick={() => void exportExcel(allFiltered, priceUnit, areaUnit, realEstateType, buildExportBaseName(meta, allFiltered.length), detailCacheRef.current)}
-            disabled={allFiltered.length === 0}>
-            Excel 내보내기
-          </button>
-          <button className="btn-outline btn-sm"
-            onClick={() => exportJSON(allFiltered, buildExportBaseName(meta, allFiltered.length))}
-            disabled={allFiltered.length === 0}>
-            JSON 내보내기
-          </button>
-          <button className="btn-outline btn-sm"
-            onClick={() => exportMarkdown(allFiltered, priceUnit, areaUnit, realEstateType, buildExportBaseName(meta, allFiltered.length))}
-            disabled={allFiltered.length === 0}>
-            MD 내보내기
-          </button>
+          {exportFetchProgress ? (
+            <>
+              <span className="dup-count-hint">
+                상세정보 수집 중… ({exportFetchProgress.current.toLocaleString()}/{exportFetchProgress.total.toLocaleString()})
+              </span>
+              <button className="btn-outline btn-sm" onClick={() => { exportCancelRef.current = true; }}>
+                취소
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn-outline btn-sm"
+                onClick={() => setExportConfirm('excel')}
+                disabled={allFiltered.length === 0}>
+                Excel 내보내기
+              </button>
+              <button className="btn-outline btn-sm"
+                onClick={() => setExportConfirm('json')}
+                disabled={allFiltered.length === 0}>
+                JSON 내보내기
+              </button>
+              <button className="btn-outline btn-sm"
+                onClick={() => setExportConfirm('md')}
+                disabled={allFiltered.length === 0}>
+                MD 내보내기
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1084,6 +1145,39 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
                 buyPrice={modalState.buyPrice ?? 0}
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 내보내기 시 상세특징/중개업소 상세정보 포함 여부 확인 모달 */}
+      {exportConfirm && (
+        <div className="modal-overlay" onClick={() => setExportConfirm(null)}>
+          <div className="modal-card detail-modal-card" onClick={(e) => e.stopPropagation()}>
+            <button className="cm-close" onClick={() => setExportConfirm(null)}>✕</button>
+            <div className="detail-modal-content">
+              <h3 className="detail-modal-title">상세정보 포함 여부</h3>
+              <p className="export-confirm-desc">
+                매매가 옆 + 버튼(상세특징)과 중개업소 + 버튼(업소명·주소·연락처·매물 수) 정보를
+                {' '}{EXPORT_FORMAT_LABEL[exportConfirm]} 내보내기에 포함할까요?
+                <br />포함하면 매물별로 추가 조회가 필요해 매물 수가 많을 경우 시간이 걸릴 수 있습니다.
+              </p>
+              <div className="confirm-actions">
+                <button className="confirm-btn" onClick={() => {
+                  const format = exportConfirm;
+                  setExportConfirm(null);
+                  void performExport(format, false);
+                }}>
+                  현재 데이터만
+                </button>
+                <button className="confirm-btn" onClick={() => {
+                  const format = exportConfirm;
+                  setExportConfirm(null);
+                  void performExport(format, true);
+                }}>
+                  상세정보 포함
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

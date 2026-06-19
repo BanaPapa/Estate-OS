@@ -1381,11 +1381,11 @@ body {
   stroke-width: 2.2;
   fill: none;
 }
-/* 중지 버튼 변형 */
+/* 중지 버튼 변형 — 의미상 위험색(red)이 아닌 테마 accent 색상을 그대로 따른다 */
 .eos-run-btn.stop {
   color: #fff;
-  background: linear-gradient(120deg, #ff8a99, var(--red));
-  box-shadow: 0 12px 26px -10px rgba(251, 107, 124, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  background: linear-gradient(120deg, var(--accent-strong), var(--blue));
+  box-shadow: 0 12px 26px -10px var(--blue-dim), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 .eos-run-btn.stop svg {
   stroke: #fff;
@@ -2404,6 +2404,14 @@ thead .col-resize-handle:active {
   padding: 20px 0;
   display: block;
   text-align: center;
+}
+
+/* ── 내보내기 확인 모달 ── */
+.export-confirm-desc {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--fg-2);
+  margin: 0;
 }
 
 /* ── 중개업소 정보 테이블 ── */
