@@ -37,6 +37,13 @@ export function formatPriceByUnit(rawPriceWon: number, unit: PriceUnit): string 
   return toPriceUnit(rawPriceWon, unit).toLocaleString();
 }
 
+// 분양권 프리미엄 전용 — 마이너스 프리미엄(P가 음수)도 표기한다.
+// 0 은 '미상/해당없음'으로 보고 '-' 처리, 그 외(음수 포함)는 부호와 함께 표기.
+export function formatPremiumByUnit(rawPriceWon: number, unit: PriceUnit): string {
+  if (rawPriceWon === 0) return '-';
+  return toPriceUnit(rawPriceWon, unit).toLocaleString();
+}
+
 // 평당가(원/평) 계산: 매매(A1)만 의미. 아파트=공급면적, 오피스텔/상가/지산=전용면적 기준.
 // 해당 없으면 0 반환.
 export function pyeongUnitPriceWon(p: Property, realEstateType: string): number {
@@ -187,7 +194,7 @@ function addPropertiesWorksheet(
       rowData.isalePrice     = p.isalePrice > 0   ? toPriceUnit(p.isalePrice, priceUnit)   : null;
       rowData.isalePyeong    = presalePyeong > 0 && p.isalePrice > 0
         ? toPriceUnit(p.isalePrice / presalePyeong, priceUnit) : null;
-      rowData.premiumPrice   = p.premiumPrice > 0 ? toPriceUnit(p.premiumPrice, priceUnit)  : null;
+      rowData.premiumPrice   = p.premiumPrice !== 0 ? toPriceUnit(p.premiumPrice, priceUnit) : null;
       rowData.optionPrice    = p.optionPrice > 0  ? toPriceUnit(p.optionPrice, priceUnit)   : null;
       rowData.totalBuyPrice  = totalBuy > 0       ? toPriceUnit(totalBuy, priceUnit)        : null;
       rowData.realPyeongPrice = realPyeongPr > 0  ? toPriceUnit(realPyeongPr, priceUnit)   : null;
@@ -400,7 +407,7 @@ export function exportMarkdown(
     if (isPresale) {
       cells.push(
         p.isalePrice > 0 ? formatPriceByUnit(p.isalePrice, priceUnit) : '-',
-        p.premiumPrice > 0 ? formatPriceByUnit(p.premiumPrice, priceUnit) : '-',
+        formatPremiumByUnit(p.premiumPrice, priceUnit),
         p.optionPrice > 0 ? formatPriceByUnit(p.optionPrice, priceUnit) : '-',
         totalBuy > 0 ? formatPriceByUnit(totalBuy, priceUnit) : '-',
         realPP > 0 ? formatPriceByUnit(realPP, priceUnit) : '-',
