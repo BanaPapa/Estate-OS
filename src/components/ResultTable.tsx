@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Property, SearchMeta, TRADE_TYPE_LABELS, TRADE_TYPES, isExclusiveSpaceType, isPresaleType } from '../types';
 import {
-  formatPriceByUnit, formatDirection, cleanBrokerageName, pyeongUnitPriceWon,
+  formatPriceByUnit, formatPremiumByUnit, formatDirection, cleanBrokerageName, pyeongUnitPriceWon,
   exportExcel, exportJSON, exportMarkdown, buildExportBaseName, PriceUnit, AreaUnit,
 } from '../services/api';
 import {
@@ -156,7 +156,7 @@ function Th({ colKey, label, sortK, curSortKey, curSortDir, onSort, onResizeStar
   return (
     <th
       className={className}
-      style={{ cursor: sortK ? 'pointer' : 'default', userSelect: 'none', position: 'relative' }}
+      style={{ cursor: sortK ? 'pointer' : 'default', userSelect: 'none' }}
       onClick={sortK ? () => onSort(sortK) : undefined}
     >
       {label}
@@ -316,6 +316,8 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
   const [tradeTypeFilter, setTradeTypeFilter] = useState('');
   const [spaceMin, setSpaceMin]             = useState(0);
   const [spaceMax, setSpaceMax]             = useState(0);
+  const [priceMin, setPriceMin]             = useState(0); // 만원 단위
+  const [priceMax, setPriceMax]             = useState(0); // 만원 단위
   const [page, setPage]                     = useState(0);
   const [selectedRow, setSelectedRow]       = useState<string | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -505,6 +507,21 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
       });
     }
 
+    if (priceMin > 0 || priceMax > 0) {
+      const lo = priceMin > 0 ? priceMin * 10_000 : 0;
+      const hi = priceMax > 0 ? priceMax * 10_000 : Number.POSITIVE_INFINITY;
+      fil = fil.filter((p) => {
+        // 행 대표가격(원): 분양권=분양가+P+옵션, 전세=보증금, 월세=월세, 그 외=매매가
+        const price = isPresale
+          ? p.isalePrice + p.premiumPrice + p.optionPrice
+          : p.tradeType === 'B1' ? p.warrantyPrice
+            : p.tradeType === 'B2' ? p.rentPrice
+              : p.dealPrice;
+        if (price <= 0) return true; // 가격 미상 매물은 제외하지 않음 (면적 필터와 동일 정책)
+        return price >= lo && price <= hi;
+      });
+    }
+
     if (filterText.trim()) {
       const q = filterText.trim().toLowerCase();
       fil = fil.filter((p) =>
@@ -575,7 +592,7 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
       dupCount: dupCnt,
     };
   }, [
-    properties, complexFilter, tradeTypeFilter, spaceMin, spaceMax, areaUnit,
+    properties, complexFilter, tradeTypeFilter, spaceMin, spaceMax, priceMin, priceMax, areaUnit,
     filterText, sortKey, sortDir, page, realEstateType, isDupHidden, expandedGroups,
   ]);
 
@@ -692,7 +709,7 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPresale, status, searchKey, properties.length]);
 
-  const hasActiveFilter = !!(complexFilter || tradeTypeFilter || filterText || spaceMin > 0 || spaceMax > 0);
+  const hasActiveFilter = !!(complexFilter || tradeTypeFilter || filterText || spaceMin > 0 || spaceMax > 0 || priceMin > 0 || priceMax > 0);
 
   // 현재 페이지에서 각 단지의 첫 번째 매물 → 단지 정보 버튼 표시 대상
   const firstComplexInPage = useMemo(() => {
@@ -792,6 +809,15 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
             <span className="space-unit-hint" title="면적 표시 단위는 검색 조건에서 변경">
               {areaUnit === 'pyeong' ? '평' : '㎡'}
             </span>
+          </div>
+
+          <div className="result-space-filter">
+            <input type="number" className="search-input" style={{ width: '84px' }} placeholder="최소가"
+              min={0} value={priceMin || ''} onChange={(e) => { setPriceMin(Number(e.target.value) || 0); setPage(0); }} />
+            <span className="space-tilde">~</span>
+            <input type="number" className="search-input" style={{ width: '84px' }} placeholder="최대가"
+              min={0} value={priceMax || ''} onChange={(e) => { setPriceMax(Number(e.target.value) || 0); setPage(0); }} />
+            <span className="space-unit-hint" title="가격 필터 단위: 만원 (예: 50000 = 5억). 분양권=총매매가, 전세=보증금, 월세=월세 기준">만원</span>
           </div>
 
           <input className="search-input" type="text" placeholder="단지명/특징 검색..."
@@ -1007,9 +1033,9 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
                       </td>
                     )}
                     {isPresale && (
-                      <td className="td-price presale-col">
+                      <td className={`td-price presale-col${effPremium < 0 ? ' premium-negative' : ''}`}>
                         {loading ? <span className="td-loading">…</span>
-                          : effPremium > 0 ? formatPriceByUnit(effPremium, priceUnit) : '-'}
+                          : formatPremiumByUnit(effPremium, priceUnit)}
                       </td>
                     )}
                     {isPresale && (

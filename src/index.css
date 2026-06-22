@@ -2345,6 +2345,11 @@ thead .col-resize-handle:active {
   color: var(--muted) !important;
   font-weight: 500;
 }
+/* 분양권 마이너스 프리미엄(P<0) 강조 */
+.result-table tbody td.premium-negative {
+  color: #f7768e;
+  font-weight: 600;
+}
 
 /* ── 상세/중개업소 모달 ── */
 .detail-modal-card {
