@@ -3554,6 +3554,27 @@ thead .col-resize-handle:active {
   cursor: pointer;
   flex: none;
 }
+.auth-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -2px 0 2px;
+}
+.auth-row-between .auth-remember { margin: 0; }
+.auth-link {
+  background: none;
+  border: 0;
+  color: var(--blue);
+  font-weight: 600;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+.auth-link:hover:not(:disabled) { text-decoration: underline; }
+.auth-link:disabled { opacity: 0.55; cursor: default; }
 .auth-msg { font-size: 14px; padding: 9px 12px; border-radius: 9px; }
 .auth-msg.err { color: var(--red); background: var(--red-dim); }
 .auth-msg.ok { color: var(--teal); background: var(--teal-dim); }
@@ -3733,6 +3754,56 @@ thead .col-resize-handle:active {
   box-shadow: inset 0 0 0 1px var(--red-dim);
 }
 .member-btn.reject:hover:not(:disabled) { background: var(--red-dim); }
+
+/* ── 회원 테이블 와이드 레이아웃 (이름·회사·전화 컬럼 추가) ── */
+.member-table-wide .member-row {
+  grid-template-columns: minmax(140px, 1.6fr) 100px minmax(100px, 1fr) 120px 72px 84px 90px 130px;
+}
+
+/* ── 인라인 편집 셀 ── */
+.member-editable {
+  display: inline-block;
+  min-width: 40px;
+  cursor: text;
+  border-radius: 5px;
+  padding: 2px 5px;
+  margin: -2px -5px;
+  transition: background 0.1s;
+  color: var(--fg-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.member-editable:hover { background: var(--surface-2); }
+.member-empty-val { color: var(--border-2); font-style: italic; }
+.member-inline-input {
+  width: 100%;
+  max-width: 160px;
+  height: 30px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--blue);
+  color: var(--fg);
+  padding: 0 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+/* ── 회원가입 폼 추가 요소 ── */
+.auth-required { color: var(--red); margin-left: 2px; }
+.auth-optional  { color: var(--muted); font-weight: 400; margin-left: 4px; font-size: 12px; }
+.auth-notice {
+  font-size: 13px;
+  color: var(--amber, #e3b341);
+  background: rgba(227, 179, 65, 0.10);
+  border: 1px solid rgba(227, 179, 65, 0.25);
+  border-radius: 9px;
+  padding: 10px 14px;
+  line-height: 1.55;
+}
 
 .eos-acct-logout {
   margin-left: auto;

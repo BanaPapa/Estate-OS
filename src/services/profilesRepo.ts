@@ -9,6 +9,9 @@ export interface Profile {
   email: string | null;
   status: ProfileStatus;
   role: ProfileRole;
+  name: string | null;
+  company: string | null;
+  phone: string | null;
   createdAt: string;
 }
 
@@ -17,13 +20,25 @@ interface ProfileRow {
   email: string | null;
   status: ProfileStatus;
   role: ProfileRole;
+  name: string | null;
+  company: string | null;
+  phone: string | null;
   created_at: string;
 }
 
-const COLS = 'id, email, status, role, created_at';
+const COLS = 'id, email, status, role, name, company, phone, created_at';
 
 function toProfile(r: ProfileRow): Profile {
-  return { id: r.id, email: r.email, status: r.status, role: r.role, createdAt: r.created_at };
+  return {
+    id: r.id,
+    email: r.email,
+    status: r.status,
+    role: r.role,
+    name: r.name,
+    company: r.company,
+    phone: r.phone,
+    createdAt: r.created_at,
+  };
 }
 
 // 현재 로그인 사용자의 프로필. 미설정/비로그인/행없음 → null.
@@ -57,5 +72,15 @@ export async function listProfiles(): Promise<Profile[]> {
 export async function setProfileStatus(id: string, status: ProfileStatus): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase.from('profiles').update({ status }).eq('id', id);
+  if (error) throw error;
+}
+
+// 회원 정보 수정 (관리자 전용 — RLS 가 강제).
+export async function updateProfileInfo(
+  id: string,
+  fields: { name?: string; company?: string; phone?: string },
+): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from('profiles').update(fields).eq('id', id);
   if (error) throw error;
 }

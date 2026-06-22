@@ -3,6 +3,7 @@ import { Sidebar, AppTab } from './components/Sidebar';
 import { NaverCrawlerTab } from './components/NaverCrawlerTab';
 import { SettingsPage } from './components/SettingsPage';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { ResetPasswordScreen } from './components/auth/ResetPasswordScreen';
 import { PendingApprovalScreen } from './components/auth/PendingApprovalScreen';
 import { MemberApproval } from './components/admin/MemberApproval';
 import { useCrawler } from './hooks/useCrawler';
@@ -26,11 +27,15 @@ export default function App() {
   const isAdmin = auth.profile?.role === 'admin' && auth.profile?.status === 'approved';
 
   // Supabase가 설정된 경우에만 로그인/승인 게이트 적용. 미설정이면 기존처럼 바로 사용.
+  // 비밀번호 재설정 링크로 진입 → 다른 모든 게이트보다 우선해 새 비밀번호 화면 표시.
+  if (auth.configured && auth.recovery) {
+    return <ResetPasswordScreen onSubmit={auth.updatePassword} onCancel={auth.cancelRecovery} />;
+  }
   if (auth.configured && auth.loading) {
     return <div className="auth-screen"><div className="auth-loading">불러오는 중…</div></div>;
   }
   if (auth.configured && !auth.user) {
-    return <LoginScreen onSignIn={auth.signIn} onSignUp={auth.signUp} />;
+    return <LoginScreen onSignIn={auth.signIn} onSignUp={auth.signUp} onForgotPassword={auth.requestPasswordReset} />;
   }
   // 로그인됐지만 프로필(승인 상태) 조회 중
   if (auth.configured && auth.user && auth.profileLoading) {
