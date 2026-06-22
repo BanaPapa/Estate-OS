@@ -500,16 +500,17 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
     safePage,
     dupCount,
   } = useMemo(() => {
-    // 1. Filter all properties (reps + children)
-    let fil = [...properties];
-    if (complexFilter)    fil = fil.filter((p) => p.complexName === complexFilter);
-    if (tradeTypeFilter)  fil = fil.filter((p) => p.tradeType   === tradeTypeFilter);
+    // 1. 모든 필터는 '대표(rep)' 에만 적용한다. 중복(children)은 독립적으로
+    //    필터/정렬하지 않고, 통과한 대표를 따라다니는 '접힌 폴더'로 취급한다.
+    let reps = properties.filter((p) => !p.isDuplicate);
+    if (complexFilter)    reps = reps.filter((p) => p.complexName === complexFilter);
+    if (tradeTypeFilter)  reps = reps.filter((p) => p.tradeType   === tradeTypeFilter);
 
     if (spaceMin > 0 || spaceMax > 0) {
       const toSqm = (v: number) => areaUnit === 'pyeong' ? v * PYEONG_TO_SQM : v;
       const lo = spaceMin > 0 ? toSqm(spaceMin) : 0;
       const hi = spaceMax > 0 ? toSqm(spaceMax) : Number.POSITIVE_INFINITY;
-      fil = fil.filter((p) => {
+      reps = reps.filter((p) => {
         if (p.supplySpace <= 0 && p.exclusiveSpace <= 0) return true;
         return (
           (p.supplySpace    > 0 && p.supplySpace    >= lo && p.supplySpace    <= hi) ||
@@ -521,8 +522,8 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
     if (priceMin > 0 || priceMax > 0) {
       const lo = priceMin > 0 ? priceMin * 10_000 : 0;
       const hi = priceMax > 0 ? priceMax * 10_000 : Number.POSITIVE_INFINITY;
-      fil = fil.filter((p) => {
-        // 행 대표가격(원): 분양권=총매매가(상세캐시 반영), 전세=보증금, 월세=월세, 그 외=매매가
+      reps = reps.filter((p) => {
+        // 대표 가격(원): 분양권=총매매가(상세캐시 반영), 전세=보증금, 월세=월세, 그 외=매매가
         const price = isPresale
           ? effPresaleTotalWon(p, detailCache)
           : p.tradeType === 'B1' ? p.warrantyPrice
@@ -535,33 +536,29 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
 
     if (filterText.trim()) {
       const q = filterText.trim().toLowerCase();
-      fil = fil.filter((p) =>
+      reps = reps.filter((p) =>
         p.complexName.toLowerCase().includes(q) ||
         p.dongName.toLowerCase().includes(q)    ||
         p.articleFeature.toLowerCase().includes(q),
       );
     }
 
-    // 2. Separate reps and children
-    const reps = fil.filter((p) => !p.isDuplicate);
-    const childrenArr = fil.filter((p) => !!p.isDuplicate);
-
-    // Only keep children whose parent rep also passed the filter
-    const repGroupIds = new Set(reps.map((p) => p.groupId).filter(Boolean) as string[]);
+    // 2. 통과한 대표의 자식(중복)을 원래 순서 그대로 attach.
+    //    자식은 필터 대상이 아니므로, 대표가 통과하면 그 자식은 전부 따라온다.
+    const passedGroupIds = new Set(reps.map((p) => p.groupId).filter(Boolean) as string[]);
     const childMap = new Map<string, Property[]>();
     let dupCnt = 0;
-    for (const child of childrenArr) {
-      if (child.groupId && repGroupIds.has(child.groupId)) {
-        const arr = childMap.get(child.groupId) ?? [];
-        arr.push(child);
-        childMap.set(child.groupId, arr);
+    for (const p of properties) {
+      if (p.isDuplicate && p.groupId && passedGroupIds.has(p.groupId)) {
+        const arr = childMap.get(p.groupId) ?? [];
+        arr.push(p);
+        childMap.set(p.groupId, arr);
         dupCnt++;
       }
     }
 
-    // 3. 정렬값 — 분양권 가격 컬럼은 상세캐시(detailCache) 반영값으로 정렬해
-    //    화면 표시값과 어긋나지 않게 한다(크롤러가 못 채운 매물/중복은 base가 0이라
-    //    표시는 캐시값인데 정렬은 0으로 꼬이던 문제 해결).
+    // 3. 정렬은 '대표' 에만 적용. 분양권 가격 컬럼은 상세캐시(detailCache) 반영값으로
+    //    정렬해 화면 표시값과 어긋나지 않게 한다.
     const PRESALE_PRICE_KEYS = new Set<SortKey>([
       'isalePrice', 'isalePyeong', 'premiumPrice', 'optionPrice', 'totalBuyPrice', 'realPyeongPrice',
     ]);
@@ -595,12 +592,12 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
     };
 
     const sortedReps = [...reps].sort(cmp);
-    // 그룹 내 중복(children)도 같은 기준으로 정렬 (대표 rep 은 그룹 선두 고정)
-    const sortedChildren = (gid: string | undefined): Property[] =>
-      gid ? [...(childMap.get(gid) ?? [])].sort(cmp) : [];
+    // 자식(중복)은 정렬하지 않는다 — 원래 순서 그대로 대표 뒤에 붙어 따라다닌다.
+    const childrenOf = (gid: string | undefined): Property[] =>
+      gid ? (childMap.get(gid) ?? []) : [];
 
     // 4. All data for export (always fully expanded)
-    const allFil: Property[] = sortedReps.flatMap((rep) => [rep, ...sortedChildren(rep.groupId)]);
+    const allFil: Property[] = sortedReps.flatMap((rep) => [rep, ...childrenOf(rep.groupId)]);
 
     // 5. Display rows with expansion state
     const isGroupExpanded = (gid: string) =>
@@ -608,7 +605,7 @@ export function ResultTable({ searchKey, status, properties, realEstateType, are
 
     const displayRows: Property[] = sortedReps.flatMap((rep) => {
       const expanded = rep.groupId ? isGroupExpanded(rep.groupId) : false;
-      return expanded ? [rep, ...sortedChildren(rep.groupId)] : [rep];
+      return expanded ? [rep, ...childrenOf(rep.groupId)] : [rep];
     });
 
     // 6. Paginate
