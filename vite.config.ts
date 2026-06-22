@@ -1,7 +1,45 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 // @ts-expect-error — .mjs Node 모듈 (개발 서버 전용, 타입 선언 없음)
 import { getNaverLandToken } from './server/naverTokenProvider.mjs';
+import { issueCrawlToken } from './api/_crawlTokenCore';
+
+// 로컬 개발용 /api/crawl-token 미들웨어.
+// Vercel 서버리스 함수 api/crawl-token.ts는 vite dev에서 서빙되지 않으므로,
+// 동일한 발급 로직(issueCrawlToken)을 dev 서버 미들웨어로 재현한다.
+// 환경변수는 loadEnv로 읽은 값(CRAWL_TOKEN_SECRET 포함)을 주입받는다.
+function crawlTokenDevApi(env: Record<string, string>) {
+  return {
+    name: 'crawl-token-dev-api',
+    configureServer(server: { middlewares: { use: (path: string, fn: unknown) => void } }) {
+      server.middlewares.use('/api/crawl-token', async (req: any, res: any, next: () => void) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+        try {
+          const auth = req.headers['authorization'] ?? '';
+          const accessToken = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+          const { status, body } = await issueCrawlToken(accessToken, {
+            supabaseUrl: env.VITE_SUPABASE_URL,
+            supabaseKey: env.VITE_SUPABASE_ANON_KEY,
+            secret: env.CRAWL_TOKEN_SECRET,
+          });
+          res.statusCode = status;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(body));
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        void next; // 응답을 직접 종료하므로 next 미호출
+      });
+    },
+  };
+}
 
 // new.land /api/articles (빌라·단독) 는 Bearer 토큰 필수.
 // 수동 토큰(x-naver-bearer)이 없으면 헤드리스 브라우저로 자동 발급해 주입한다.
@@ -29,8 +67,11 @@ function naverTokenInjector() {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), naverTokenInjector()],
+export default defineConfig(({ mode }) => {
+  // 접두사 없는 변수까지 모두 로드(CRAWL_TOKEN_SECRET 등). 세 번째 인자 '' = 전체.
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+  plugins: [react(), naverTokenInjector(), crawlTokenDevApi(env)],
   server: {
     port: 5174,
     proxy: {
@@ -97,4 +138,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });
